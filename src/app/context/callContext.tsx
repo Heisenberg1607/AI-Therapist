@@ -6,6 +6,8 @@ interface CallContextType {
   setText: React.Dispatch<React.SetStateAction<string>>;
   isProcessing: boolean;
   setIsProcessing: React.Dispatch<React.SetStateAction<boolean>>;
+  audioUrl: string;
+  setAudioUrl: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const CallContext = createContext<CallContextType | null>(null);
@@ -17,10 +19,11 @@ interface CallContextProviderProps {
 export const CallContextProvider = ({ children }: CallContextProviderProps) => {
   const [text, setText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
 
   return (
     <CallContext.Provider
-      value={{ text, setText, isProcessing, setIsProcessing }}
+      value={{ text, setText, isProcessing, setIsProcessing, audioUrl, setAudioUrl }}
     >
       {children}
     </CallContext.Provider>

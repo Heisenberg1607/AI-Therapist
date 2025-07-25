@@ -1,15 +1,54 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Phone } from 'lucide-react';
-import React from 'react'
+import React, {useEffect, useRef} from 'react'
 import { useCallContext } from "@/app/context/callContext";
 
 interface AICallWindowProps {
   onEnd: () => void;
+  sessionStarted: boolean;
 }
 
-const AICallWindow: React.FC<AICallWindowProps> = ({ onEnd }) => {
+const AICallWindow: React.FC<AICallWindowProps> = ({ onEnd , sessionStarted}) => {
+
   const { text, isProcessing } = useCallContext();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+    useEffect(() => {
+      if (sessionStarted) {
+        if (!audioRef.current) {
+          console.log("session started", sessionStarted);
+          audioRef.current = new Audio(
+            "http://localhost:5001/audio/b2a0d62b-be91-430f-9846-f5d83a59788c.mp3"
+          );
+          audioRef.current
+            .play()
+            .then(() => {
+              console.log("Welcome audio playing");
+            })
+            .catch((error) => {
+              console.error("Audio playback failed:", error);
+            });
+        }
+      } else {
+        console.log("session ended", sessionStarted);
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current = null;
+        }
+      }
+    }, [sessionStarted]);
+
+    const handleEnd = () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        audioRef.current = null;
+      }
+      onEnd();
+    };
+
   console.log("AICallWindow text:", text);
   return (
     <div className="w-full h-full">
@@ -47,9 +86,9 @@ const AICallWindow: React.FC<AICallWindowProps> = ({ onEnd }) => {
 
           <Button
             className="bg-red-600 hover:bg-red-700 text-white font-medium py-4 px-8 rounded-full text-lg shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl"
-            onClick={() => onEnd()}
+            onClick={handleEnd}
           >
-            <Phone className="w-5 h-5  rotate-[135deg]" />
+            <Phone className="w-5 h-5 rotate-[135deg]" />
           </Button>
 
           <div className="w-10 h-10 bg-white bg-opacity-20 backdrop-blur-sm rounded-full flex items-center justify-center">

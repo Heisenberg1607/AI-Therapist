@@ -31,3 +31,20 @@ export const generateResponse = async (
     res.status(500).json({ message: "Server error", error });
   }
 };
+
+export const getWelcomeMessage = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const welcomeMessage =
+      "Hi, I’m really glad you’re here today. Before we begin, I want you to know that this is a safe and confidential space. There’s no judgment here—just a place for you to talk about whatever’s on your mind. We’ll go at your pace, and you only need to share what you feel comfortable with. This time is just for you.";
+    const elevanLabsResponse = await generateSpeechFromElevenLabs(welcomeMessage);
+
+    console.log("Welcome message audio:", elevanLabsResponse);
+    res.status(200).json({ message: welcomeMessage });
+  } catch (error) {
+    console.error("Error in getWelcomeMessage:", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};

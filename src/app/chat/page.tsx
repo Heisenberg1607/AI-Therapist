@@ -33,7 +33,7 @@ const Page = () => {
                 {!sessionStarted ? (
                   <StartSession onStart={() => setSessionStarted(true)} />
                 ) : (
-                  <AICallWindow onEnd={() => setSessionStarted(false)} />
+                    <AICallWindow onEnd={() => setSessionStarted(false)} sessionStarted={ sessionStarted} />
                 )}
               </div>
             </div>

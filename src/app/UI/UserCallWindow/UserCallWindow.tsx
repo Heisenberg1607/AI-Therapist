@@ -5,16 +5,25 @@ import React from "react";
 
 import { useCallContext } from "@/app/context/callContext";
 
-const UserCallWindow = () => {
+interface UserCallWindowProps {
+  sessionStarted: boolean;
+}
+
+const UserCallWindow = ({ sessionStarted }: UserCallWindowProps) => {
   // const [text, setText] = useState("");
   const { setText, setIsProcessing } = useCallContext();
+
+  console.log("sessionStarted in UserCallWindow:", sessionStarted);
+  
+
+  
 
   const handleOnRecord = () => {
     console.log("Recording started");
 
     const speechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!speechRecognition) {
       console.error("SpeechRecognition API is not supported in this browser.");
       return;
@@ -55,38 +64,38 @@ const UserCallWindow = () => {
   };
 
   const sendTranscriptToAPI = async (transcript: string) => {
-   setIsProcessing(true);
-   if (!transcript.trim()) return;
+    setIsProcessing(true);
+    if (!transcript.trim()) return;
 
-   try {
-     const response = await fetch("http://localhost:5001/api/getResponse", {
-       method: "POST",
-       headers: {
-         "Content-Type": "application/json",
-         Accept: "application/json",
-       },
-       body: JSON.stringify({ userResponse: transcript }),
-     });
+    try {
+      const response = await fetch("http://localhost:5001/api/getResponse", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({ userResponse: transcript }),
+      });
 
-     if (!response.ok) {
-       const errorBody = await response.text();
-       throw new Error(
-         `HTTP error! status: ${response.status}, body: ${errorBody}`
-       );
-     }
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(
+          `HTTP error! status: ${response.status}, body: ${errorBody}`
+        );
+      }
 
-     const data = await response.json();
-     setText(data.audio); // Set AI's response
-     setIsProcessing(false);
-     console.log("🎧 AI Response:", data);
+      const data = await response.json();
+      setText(data.audio); // Set AI's response
+      setIsProcessing(false);
+      console.log("🎧 AI Response:", data);
 
-     const audio = new Audio(data.audio);
-     audio.play();
-   } catch (error) {
-     console.error("❌ Failed to send transcript:", error);
-     setIsProcessing(false);
-   }
- };
+      const audio = new Audio(data.audio);
+      audio.play();
+    } catch (error) {
+      console.error("❌ Failed to send transcript:", error);
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <Card className="w-full max-w-md h-96 bg-green-600 border-none shadow-2xl overflow-hidden relative group mx-auto">

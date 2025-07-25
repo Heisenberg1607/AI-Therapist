@@ -1,6 +1,7 @@
 import express,{Router} from "express";
 
 import { generateResponse } from "../Controller/Controller"
+import { getWelcomeMessage } from "../Controller/Controller";
 
 const router: Router = express.Router();
 
@@ -18,6 +19,9 @@ router.post("/getResponse", async (req, res, next) => {
     next(error);
   }
 });
+
+// Welcome Message route
+router.get("/welcomeMessage", getWelcomeMessage);
 
 
 export default router;
