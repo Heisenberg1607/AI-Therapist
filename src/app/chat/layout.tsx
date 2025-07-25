@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import Navbar from "./UI/Navbar/navbar";
-import Footer from "@/app/UI/Footer/footer"
+import "../globals.css";
+
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,9 +29,24 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Navbar></Navbar>
+        <div className="absolute inset-0">
+          <div className="stars-bg"></div>
+          {Array.from({ length: 50 }).map((_, i) => (
+            <div
+              key={i}
+              className="star absolute w-1 h-1 bg-green-400 rounded-full opacity-100 animate-pulse"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 3}s`,
+                animationDuration: `${2 + Math.random() * 3}s`,
+              }}
+            />
+          ))}
+
+        </div>
         {children}
-        <Footer></Footer>
+        
       </body>
     </html>
   );
