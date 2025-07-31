@@ -2,14 +2,43 @@
 import UserCallWindow from "../UI/UserCallWindow/UserCallWindow";
 import AICallWindow from "../UI/AICallWindow/AICallWindow";
 import StartSession from "../UI/StartSession/StartSession";
-import { useState } from "react";
+import {  useState } from "react";
 import SubNavbar from "../UI/SubNavbar/SubNavbar";
 import { CallContextProvider } from "@/app/context/callContext";
 
-
-
 const Page = () => {
   const [sessionStarted, setSessionStarted] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  const handleStartSession = async () => {
+    try {
+      console.log("Attempting to start session..."); // Add logging
+      const res = await fetch("http://localhost:5001/api/startSession", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to start session: ${res.status} ${errorText}`);
+      }
+
+      const data = await res.json();
+      console.log("Session started successfully:", data); 
+      setSessionId(data.sessionId);
+      setSessionStarted(true);
+      console.log("Session ID:", sessionId); 
+    } catch (error) {
+      console.error("Session start error:", error);
+      // Add user feedback here
+    }
+  };
+
+  
 
   return (
     <CallContextProvider>
@@ -23,7 +52,7 @@ const Page = () => {
             {/* User Call Window */}
             <div className="flex justify-center items-center h-[420px]">
               <div className="w-full max-w-md">
-                <UserCallWindow sessionStarted={sessionStarted} />
+                <UserCallWindow sessionStarted={sessionStarted} sessionId={sessionId} />
               </div>
             </div>
 
@@ -31,9 +60,12 @@ const Page = () => {
             <div className="flex justify-center items-center h-[420px]">
               <div className="w-full max-w-md">
                 {!sessionStarted ? (
-                  <StartSession onStart={() => setSessionStarted(true)} />
+                  <StartSession onStart={handleStartSession} />
                 ) : (
-                    <AICallWindow onEnd={() => setSessionStarted(false)} sessionStarted={ sessionStarted} />
+                  <AICallWindow
+                    onEnd={() => setSessionStarted(false)}
+                    sessionStarted={sessionStarted}
+                  />
                 )}
               </div>
             </div>

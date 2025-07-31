@@ -7,9 +7,10 @@ import { useCallContext } from "@/app/context/callContext";
 
 interface UserCallWindowProps {
   sessionStarted: boolean;
+  sessionId: string | null;
 }
 
-const UserCallWindow = ({ sessionStarted }: UserCallWindowProps) => {
+const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
   // const [text, setText] = useState("");
   const { setText, setIsProcessing } = useCallContext();
 
@@ -74,7 +75,7 @@ const UserCallWindow = ({ sessionStarted }: UserCallWindowProps) => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ userResponse: transcript }),
+        body: JSON.stringify({ sessionId: sessionId ,userResponse: transcript }),
       });
 
       if (!response.ok) {

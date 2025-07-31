@@ -2,11 +2,18 @@ import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+if (!process.env.ELEVEN_LABS_API_KEY) {
+  throw new Error("ELEVEN_LABS_API_KEY is not set in environment variables");
+}
 
 const elevenlabs = new ElevenLabsClient({
   apiKey:
-    process.env.ELEVEN_LABS_API_KEY ||
-    "sk_25e3781fbb228ec509129fea7bbb407698c829fe7f7a318a",
+    process.env.ELEVEN_LABS_API_KEY 
+
 });
 
 // Helper to convert ReadableStream to Buffer

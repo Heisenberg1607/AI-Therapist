@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id        String     @id @default(uuid())
+  createdAt DateTime   @default(now())
+  messages  Message[]
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  session    Session  @relation(fields: [sessionId], references: [id])
+  sessionId  String
+  sender     Sender
+  content    String
+  createdAt  DateTime @default(now())
+}
+
+enum Sender {
+  USER
+  AI
+}
