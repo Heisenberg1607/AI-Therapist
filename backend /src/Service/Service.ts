@@ -1,9 +1,11 @@
-import axios from "axios";
 
+import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"; // Replace with actual API endpoint
-const DEEPSEEK_API_KEY =
-  process.env.DEEPSEEK_API_URL || "sk-b47e1de3f57e4c9eb888b040d2439f5b"; // Store securely
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY// Store securely
 
 export const AIgenerateResponse = async (
   userResponse:string

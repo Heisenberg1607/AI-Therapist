@@ -1,4 +1,7 @@
 import axios from "axios";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 interface MurfResponse {
   audioFile: string;
@@ -26,8 +29,7 @@ export const generateSpeechFromMurf = async (
           "Content-Type": "application/json",
           Accept: "application/json",
           "api-key":
-            process.env.MURF_API_KEY ||
-            "ap2_44294932-5ebc-4b0f-b8cc-00b3c0825076", // Store securely
+            process.env.MURF_API_KEY , // Store securely
         },
       }
     );
