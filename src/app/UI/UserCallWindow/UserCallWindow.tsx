@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mic } from "lucide-react";
-import React from "react";
-
+import { Mic, MicOff } from "lucide-react";
+import React, {useRef} from "react";
 import { useCallContext } from "@/app/context/callContext";
 
 interface UserCallWindowProps {
@@ -12,15 +11,20 @@ interface UserCallWindowProps {
 
 const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
   // const [text, setText] = useState("");
-  const { setText, setIsProcessing } = useCallContext();
+  const { setText, setIsProcessing} = useCallContext();
+  // const [isRecording, setIsRecording] = useState(false);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   console.log("sessionStarted in UserCallWindow:", sessionStarted);
-  
-
-  
 
   const handleOnRecord = () => {
     console.log("Recording started");
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
 
     const speechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -30,6 +34,7 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
       return;
     } else {
       console.log("SpeechRecognition API is supported.");
+      
     }
     const recognition = new speechRecognition();
 
@@ -40,7 +45,7 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
     recognition.onresult = async function (event) {
       const result = event.results[event.resultIndex];
 
-      if (!result.isFinal) return; // Wait for final result only
+      if (!result.isFinal) return; 
 
       const transcript = result[0].transcript.trim();
       console.log("Transcript is this brooooo", transcript);
@@ -75,7 +80,7 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({ sessionId: sessionId ,userResponse: transcript }),
+        body: JSON.stringify({ sessionId, userResponse: transcript }),
       });
 
       if (!response.ok) {
@@ -86,18 +91,22 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
       }
 
       const data = await response.json();
-      setText(data.audio); // Set AI's response
+      setText(data.audio); // Set audio URL in text context (for debug or TTS preview)
       setIsProcessing(false);
-      console.log("🎧 AI Response:", data);
 
-      const audio = new Audio(data.audio);
-      audio.play();
+      // Stop any previous audio before playing new one
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+
+      audioRef.current = new Audio(data.audio);
+      audioRef.current.play();
     } catch (error) {
-      console.error("❌ Failed to send transcript:", error);
+      console.error("Failed to send transcript:", error);
       setIsProcessing(false);
     }
   };
-
   return (
     <Card className="w-full max-w-md h-96 bg-green-600 border-none shadow-2xl overflow-hidden relative group mx-auto">
       <div className="absolute inset-0">
@@ -120,13 +129,22 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
           </span>
         </div>
 
-        <Button
-          size="sm"
-          className="bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm border-none rounded-full w-10 h-10 p-0"
-          onClick={handleOnRecord}
-        >
-          <Mic className="w-4 h-4 text-white" />
-        </Button>
+        {sessionStarted ? (
+          <Button
+            size="sm"
+            className="bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm border-none rounded-full w-10 h-10 p-0"
+            onClick={handleOnRecord}
+          >
+            <Mic className="w-4 h-4 text-white" />
+          </Button>
+        ) : (
+          <Button
+            size="sm"
+            className="bg-white bg-opacity-20 hover:bg-opacity-30 backdrop-blur-sm border-none rounded-full w-10 h-10 p-0"
+          >
+            <MicOff className="w-4 h-4 text-white" />
+          </Button>
+        )}
       </div>
     </Card>
   );
