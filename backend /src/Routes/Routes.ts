@@ -30,9 +30,6 @@ router.post("/getResponse", async (req, res, next) => {
   }
 });
 
-
-
-
 // Welcome Message route
 router.get("/welcomeMessage", getWelcomeMessage);
 

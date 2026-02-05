@@ -13,7 +13,7 @@ interface CallContextType {
 const CallContext = createContext<CallContextType | null>(null);
 
 interface CallContextProviderProps {
-  children: ReactNode; // ✅ Properly typed children
+  children: ReactNode; 
 }
 
 export const CallContextProvider = ({ children }: CallContextProviderProps) => {
