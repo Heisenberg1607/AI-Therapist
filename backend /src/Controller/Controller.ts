@@ -1,16 +1,85 @@
 // import { generateSpeechFromElevenLabs } from './../Service/ElevanLabsService';
-import { Request, Response } from "express";
+import { Request,Response } from "express";
 import { AIgenerateResponse } from "../Service/Service";
 import { generateSpeechFromMurf } from "../Service/MurfService";
 import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
 import { Sender } from "@prisma/client";
 import { createMessage, getMessagesBySession } from "../Model/messageModel";
 import { createSession } from "../Model/sessionModel";
+import { AuthRequest } from "../middleware/authMiddleware";
+import { createUser, findUserByEmail, verifyPassword } from "../Model/userModel";
+import { generateToken } from "../utils/jwtUtils";
 
 
-export const startSession = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response) => {
   try {
-    const session = await createSession(); // no userId
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password are required." });
+    }
+
+    const user = await findUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    const isPasswordValid = await verifyPassword(password, user.password);
+
+    if (!isPasswordValid){
+    return res.status(401).json({ message: "Invalid password." });
+    }
+
+    const token = await generateToken(user.id);
+
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      token,
+    })
+  } catch (error) {
+    console.error("Login error", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+}
+
+export const register = async (req: Request, res: Response) => {
+  try {
+    const { name, email, password } = req.body;
+    if(!name || !email || !password){
+      return res.status(400).json({ message: "Name, email and password are required." });
+    }
+
+    const existingUser = await findUserByEmail(email);
+    if(existingUser){
+      return res.status(409).json({ message: "User already exists with this email." });
+    }
+
+    const user = await createUser(name, email, password);
+    const token = await generateToken(user.id);
+
+    res.status(201).json({
+      message: "User registered successsfully",
+      user: {
+        user,
+        token
+      }
+    })
+  } catch (error) {
+    console.log("Register error", error);
+    res.status(500).json({ message: "Server error", error });
+  }
+}
+
+
+export const startSession = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId;
+    
+    const session = await createSession(userId); // From the middleware
     res.status(201).json({ sessionId: session.id });
   } catch (error) {
     console.error("Error starting session:", error);
@@ -47,7 +116,7 @@ export const startSession = async (req: Request, res: Response) => {
 // };
 
 export const generateResponse = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
@@ -87,7 +156,7 @@ export const generateResponse = async (
 
 
 export const getWelcomeMessage = async (
-  req: Request,
+  req: AuthRequest,
   res: Response
 ): Promise<void> => {
   try {
@@ -102,3 +171,5 @@ export const getWelcomeMessage = async (
     res.status(500).json({ message: "Server error", error });
   }
 };
+
+

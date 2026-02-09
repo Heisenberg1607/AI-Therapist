@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Mic, MicOff } from "lucide-react";
 import React, {useRef} from "react";
 import { useCallContext } from "@/app/context/callContext";
+import { sendMessage } from "@/app/lib/api";
 
 interface UserCallWindowProps {
   sessionStarted: boolean;
@@ -71,26 +72,14 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
 
   const sendTranscriptToAPI = async (transcript: string) => {
     setIsProcessing(true);
-    if (!transcript.trim()) return;
+    if (!transcript.trim() || !sessionId) {
+      setIsProcessing(false);
+      return;
+    }
 
     try {
-      const response = await fetch("http://localhost:5001/api/getResponse", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({ sessionId, userResponse: transcript }),
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(
-          `HTTP error! status: ${response.status}, body: ${errorBody}`
-        );
-      }
-
-      const data = await response.json();
+      const data = await sendMessage(sessionId, transcript);
+      
       setText(data.audio); // Set audio URL in text context (for debug or TTS preview)
       setIsProcessing(false);
 
@@ -105,6 +94,12 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
     } catch (error) {
       console.error("Failed to send transcript:", error);
       setIsProcessing(false);
+      
+      // If it's a token expiry error, the user will be redirected to login by the API error handler
+      if (error instanceof Error && error.message.includes("Session expired")) {
+        // Optionally show a user-friendly message
+        alert("Your session has expired. Please login again.");
+      }
     }
   };
   return (

@@ -21,6 +21,7 @@ import {
   BarChart3,
   User,
 } from "lucide-react";
+import { ProtectedRoute } from "../Components/ProtectedRoute";
 
 export default function OverviewPage() {
   const stats = {
@@ -87,7 +88,8 @@ export default function OverviewPage() {
   ];
 
   return (
-    <div className="p-8 mt-10">
+    <ProtectedRoute>
+      <div className="p-8 mt-10">
       
 
       {/* Stats Overview */}
@@ -354,5 +356,6 @@ export default function OverviewPage() {
         </div>
       </div>
     </div>
+    </ProtectedRoute>
   );
 }

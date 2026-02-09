@@ -1,8 +1,12 @@
 import { prisma } from "../prisma/prismaClient";
 
-export const createSession = async () => {
+export const createSession = async (userId?: string) => {
+  const sessionData: any = {};
+  if (userId) {
+    sessionData.userId = userId;
+  }
   return await prisma.session.create({
-    data: {},
+    data: sessionData,
   });
 };
 
