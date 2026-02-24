@@ -21,7 +21,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto flex items-center justify-between px-6 py-3">
         {/* Logo or brand */}
         <Link href="/" className="text-xl font-bold text-white hover:text-green-400 transition-colors">
-          VAD mental health support and analytics
+          AI Therapist
         </Link>
 
         {/* Navigation Menu */}
