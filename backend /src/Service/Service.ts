@@ -1,15 +1,16 @@
-
 import axios from "axios";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-const DEEPSEEK_API_URL = "https://api.deepseek.com/chat/completions"; // Replace with actual API endpoint
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY// Store securely
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
-export const AIgenerateResponse = async (
-  userResponse:string
-) => {
+if (!OPENAI_API_KEY) {
+  throw new Error("OPENAI_API_KEY is not set in environment variables");
+} 
+
+export const AIgenerateResponse = async (userResponse: string) => {
   const prompt = `
 You are a compassionate and experienced clinical psychologist conducting a virtual therapy session.
 
@@ -25,7 +26,7 @@ Examples:
 User: I just feel so tired all the time, even when I get enough sleep.  
 Therapist: It sounds like your exhaustion runs deeper than just physical tiredness. That kind of fatigue can be incredibly hard to carry. What do you think has been weighing on you lately?
 
-User: I haven’t been enjoying anything recently. Things that used to make me happy feel empty now.  
+User: I haven't been enjoying anything recently. Things that used to make me happy feel empty now.  
 Therapist: That feeling of emptiness can be so painful, especially when it takes away joy from the things you used to love. When did you first start noticing this change?
 
 Now respond to the following message:
@@ -34,43 +35,30 @@ User: "${userResponse}"
 `;
 
   try {
-    console.log("Sending request to:", DEEPSEEK_API_URL);
-    console.log("Request payload:", {
-      model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 500,
-    });
-    console.log("Headers:", {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
-    });
-
     const response = await axios.post(
-      DEEPSEEK_API_URL,
+      OPENAI_API_URL,
       {
-        model: "deepseek-chat",
+        model: "gpt-4o-mini", 
         messages: [{ role: "user", content: prompt }],
         temperature: 1.0,
-        max_tokens: 1000,
+        max_tokens: 400,
       },
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
         },
-      }
+      },
     );
-      
-      const content = response.data.choices[0].message.content;
 
+    const content = response.data.choices[0].message.content;
     return content;
   } catch (error) {
     if (axios.isAxiosError(error)) {
-      console.error("Axios error:", error.response?.data);
+      console.error("OpenAI API error:", error.response?.data);
     } else {
       console.error("Unexpected error:", error);
     }
-    throw new Error("Failed to generate SOW");
+    throw new Error("Failed to generate AI response");
   }
 };
