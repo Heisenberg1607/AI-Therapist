@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+model User{
+  id        String @id @default (uuid())
+  email     String @unique
+  password  String // will store hashed values
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sessions  Session[]
+}
+
+model Session {
+  id        String     @id @default(uuid())
+  user      User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String?      // link to user table 
+  createdAt DateTime   @default(now())
+  messages  Message[]
+  crisisFlag  Boolean @default(false)
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  session    Session  @relation(fields: [sessionId], references: [id])
+  sessionId  String   // link to session table
+  sender     Sender
+  content    String
+  createdAt  DateTime @default(now())
+}
+
+enum Sender {
+  USER
+  AI
+}
