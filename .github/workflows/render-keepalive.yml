@@ -11,7 +11,7 @@ jobs:
     steps:
       - name: Ping backend health endpoint
         env:
-          HEALTH_URL: ${{ process.env.HEALTH_URL }}
+          HEALTH_URL: ${{ secrets.HEALTH_URL }}
         run: |
           set -e
           code=$(curl -sS -o /dev/null -w "%{http_code}" "$HEALTH_URL")
