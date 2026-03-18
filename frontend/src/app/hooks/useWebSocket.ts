@@ -12,7 +12,11 @@ export const useWebSocket = () => {
     const token = getToken();
     if (!token) return;
 
-    socketRef.current = io(process.env.NEXT_PUBLIC_API_URL, {
+    const wsUrl =
+      process.env.NEXT_PUBLIC_WS_URL ||
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/api$/, "");
+
+    socketRef.current = io(wsUrl, {
       auth: { token },
     });
 
