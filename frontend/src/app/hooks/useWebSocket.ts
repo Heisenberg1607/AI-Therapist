@@ -12,7 +12,7 @@ export const useWebSocket = () => {
     const token = getToken();
     if (!token) return;
 
-    socketRef.current = io("http://localhost:5001", {
+    socketRef.current = io(process.env.API_BASE_URL, {
       auth: { token },
     });
 
