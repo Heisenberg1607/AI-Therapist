@@ -19,7 +19,7 @@ const AICallWindow: React.FC<AICallWindowProps> = ({ onEnd , sessionStarted}) =>
       if (sessionStarted) {
         if (!audioRef.current) {
           audioRef.current = new Audio(
-            "http://localhost:5001/audio/398d9e9e-2e99-44ba-b66e-c3d4fffba018.mp3",
+            "/welcomeMessage.mp3",
           );
           audioRef.current
             .play()

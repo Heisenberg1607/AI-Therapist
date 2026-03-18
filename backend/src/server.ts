@@ -14,8 +14,7 @@ import { getMessagesBySession } from "./Model/messageModel";
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-let msgCount = 0;
-let windowStart = Date.now();
+
 
 // Existing middleware
 app.use(cors());
@@ -66,6 +65,9 @@ io.use((socket, next) => {
 
 // WebSocket event handlers
 io.on("connection", (socket) => {
+
+  let msgCount = 0;
+  let windowStart = Date.now();
 
   
   console.log("Client connected:", socket.id, "User:", socket.data.userId);

@@ -1,8 +1,8 @@
 // import { generateSpeechFromElevenLabs } from './../Service/ElevanLabsService';
 import { Request,Response } from "express";
 import { AIgenerateResponse } from "../Service/Service";
-import { generateSpeechFromMurf } from "../Service/MurfService";
-import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
+// import { generateSpeechFromMurf } from "../Service/MurfService";
+// import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
 import { Sender } from "@prisma/client";
 import { createMessage, getMessagesBySession } from "../Model/messageModel";
 import { createSession } from "../Model/sessionModel";
@@ -62,12 +62,14 @@ export const register = async (req: Request, res: Response) => {
     const token = await generateToken(user.id);
 
     res.status(201).json({
-      message: "User registered successsfully",
+      message: "User registered successfully",
       user: {
-        user,
-        token
-      }
-    })
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      },
+      token,
+    });
   } catch (error) {
     console.log("Register error", error);
     res.status(500).json({ message: "Server error", error });

@@ -1,6 +1,6 @@
 import { getAuthHeaders, removeToken } from "./auth";
 
-const API_BASE_URL = "http://localhost:5001/api";
+const API_BASE_URL = process.env.API_BASE_URL;
 
 interface LoginResponse {
   message: string;

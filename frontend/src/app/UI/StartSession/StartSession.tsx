@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
-import { Heart, ChartColumnBig } from 'lucide-react';
+import { Heart } from 'lucide-react';
 import React, { useState } from 'react'
-import Link from "next/link";
+// import Link from "next/link";
 
 interface StartSessionProps {
   onStart: () => void;
@@ -35,7 +35,7 @@ const StartSession: React.FC<StartSessionProps> = ({ onStart }) => {
         Start Session
       </Button>
 
-      <Link href="/dashboard" className="w-full">
+      {/* <Link href="/dashboard" className="w-full">
         <Button
           className="bg-green-600 hover:bg-green-700 text-white font-medium py-6 px-8 rounded-lg text-lg shadow-lg transform transition-all duration-200 hover:scale-105 hover:shadow-xl w-full"
           
@@ -47,7 +47,7 @@ const StartSession: React.FC<StartSessionProps> = ({ onStart }) => {
           />
           Past Conversations and Analytics
         </Button>
-      </Link>
+      </Link> */}
     </div>
   );
 };
