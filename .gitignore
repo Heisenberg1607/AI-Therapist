@@ -35,10 +35,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env
-.env.*
 backend/.env
-backend/.env.*
-frontend/.env.local
+
+
 
 
 # vercel
@@ -49,3 +48,11 @@ frontend/.env.local
 next-env.d.ts
 # node modules for backend
 backend/node_modules
+
+# backend compiled output
+backend/dist
+
+# generated Prisma client in node_modules is rebuilt at build time
+# audio files generated at runtime
+backend/public/audio/
+backend/audio/

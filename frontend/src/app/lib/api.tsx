@@ -1,6 +1,6 @@
 import { getAuthHeaders, removeToken } from "./auth";
 
-const API_BASE_URL = process.env.API_BASE_URL;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface LoginResponse {
   message: string;
