@@ -1,7 +1,7 @@
 import express,{Router} from "express";
 
 // import { generateResponse } from "../Controller/Controller"
-import { getWelcomeMessage } from "../Controller/Controller";
+// import { getWelcomeMessage } from "../Controller/Controller";
 import { startSession } from "../Controller/Controller";
 import { login , register } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
@@ -38,7 +38,7 @@ router.post("/startSession", authenticate, async (req, res, next) => {
 // });
 
 // Welcome Message route (protected)
-router.get("/welcomeMessage", authenticate, getWelcomeMessage);
+// router.get("/welcomeMessage", authenticate, getWelcomeMessage);
 
 
 export default router;

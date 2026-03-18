@@ -115,22 +115,22 @@ export const sendMessage = async (
   return response.json();
 };
 
-export const getWelcomeMessage = async (): Promise<{
-  message: string;
-  audio: string;
-}> => {
-  const response = await fetch(`${API_BASE_URL}/welcomeMessage`, {
-    headers: getAuthHeaders(),
-  });
+// export const getWelcomeMessage = async (): Promise<{
+//   message: string;
+//   audio: string;
+// }> => {
+//   const response = await fetch(`${API_BASE_URL}/welcomeMessage`, {
+//     headers: getAuthHeaders(),
+//   });
 
-  if (!response.ok) {
-    if (response.status === 401) {
-      removeToken();
-      throw new Error("Session expired. Please login again.");
-    }
-    const error = await response.json();
-    throw new Error(error.message || "Failed to get welcome message");
-  }
+//   if (!response.ok) {
+//     if (response.status === 401) {
+//       removeToken();
+//       throw new Error("Session expired. Please login again.");
+//     }
+//     const error = await response.json();
+//     throw new Error(error.message || "Failed to get welcome message");
+//   }
 
-  return response.json();
-};
+//   return response.json();
+// };
