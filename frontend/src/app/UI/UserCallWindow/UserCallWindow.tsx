@@ -5,14 +5,14 @@ import { Mic, MicOff } from "lucide-react";
 import CrisisModal from "@/app/UI/UserCallWindow/CrisisModal";
 import { useUserCallWindow } from "@/app/hooks/useUserCallWindow";
 
-
 interface UserCallWindowProps {
   sessionStarted: boolean;
   sessionId: string | null;
-} 
+}
 
 const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
-  const { handleOnRecord, isConnected, isCrisis, dismissCrisis } =useUserCallWindow({ sessionId });
+  const { handleOnRecord, isRecording, isConnected, isCrisis, dismissCrisis } =
+    useUserCallWindow({ sessionId });
 
   return (
     <>
@@ -32,10 +32,18 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
           </div>
         </div>
 
-        {/* WebSocket Status Indicator (optional) */}
+        {/* WebSocket Status Indicator */}
         {isConnected && (
           <div className="absolute top-2 right-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+          </div>
+        )}
+
+        {/* Recording indicator */}
+        {isRecording && (
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-red-500 bg-opacity-80 rounded-full px-2 py-1">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            <span className="text-white text-xs font-medium">Recording</span>
           </div>
         )}
 
@@ -47,8 +55,15 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
           </div>
 
           {sessionStarted && !isCrisis ? (
-            <Button onClick={handleOnRecord}>
-              <Mic />
+            <Button
+              onClick={handleOnRecord}
+              className={
+                isRecording
+                  ? "bg-red-500 hover:bg-red-600 text-white"
+                  : "bg-white text-green-600 hover:bg-gray-100"
+              }
+            >
+              {isRecording ? <MicOff /> : <Mic />}
             </Button>
           ) : (
             <Button disabled>

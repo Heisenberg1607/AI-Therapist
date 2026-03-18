@@ -1,12 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCallContext } from "@/app/context/callContext";
 import { sendMessage } from "@/app/lib/api";
 import { useWebSocket } from "@/app/hooks/useWebSocket";
-import type {
-  CustomSpeechRecognitionEvent,
-} from "@/app/types/speechRecognition";
+import type { CustomSpeechRecognitionEvent } from "@/app/types/speechRecognition";
 
 type UseUserCallWindowParams = {
   sessionId: string | null;
@@ -18,16 +16,22 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
   const { setText, setIsProcessing } = useCallContext();
   const { socket, isConnected, isCrisis, dismissCrisis } = useWebSocket();
 
+  const [isRecording, setIsRecording] = useState(false);
+
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioChunksRef = useRef<Uint8Array[]>([]);
   const isPlayingRef = useRef<boolean>(false);
+  const recognitionRef = useRef<InstanceType<
+    typeof window.SpeechRecognition | typeof window.webkitSpeechRecognition
+  > | null>(null);
+  const accumulatedTranscriptRef = useRef<string>("");
 
   // MediaSource API refs for progressive streaming
   const mediaSourceRef = useRef<MediaSource | null>(null);
   const sourceBufferRef = useRef<SourceBuffer | null>(null);
   const queueRef = useRef<Uint8Array[]>([]);
+
   const toExactArrayBuffer = useCallback((chunk: Uint8Array): ArrayBuffer => {
-    // Create an ArrayBuffer copy to satisfy appendBuffer's BufferSource type.
     const exactBuffer = new ArrayBuffer(chunk.byteLength);
     new Uint8Array(exactBuffer).set(chunk);
     return exactBuffer;
@@ -115,7 +119,6 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
     async (transcript: string) => {
       try {
         const data = await sendMessage(sessionId!, transcript);
-
         setText(data.audio);
         setIsProcessing(false);
 
@@ -182,7 +185,6 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
 
           const sourceBuffer = sourceBufferRef.current;
           if (!sourceBuffer) {
-            // SourceBuffer can be briefly unavailable while MediaSource opens.
             queueRef.current.push(uint8Chunk);
             return;
           }
@@ -289,17 +291,23 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
   );
 
   const handleOnRecord = useCallback(() => {
-    // Interruption handling (single place)
+    // --- STOP recording: user clicked mic-off ---
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    // --- START recording ---
+
+    // Interrupt any ongoing AI audio
     if (socket && isConnected) {
       socket.emit("interrupt");
     }
-
     if (socket) {
       socket.off("audioChunk");
       socket.off("audioComplete");
       socket.off("audioError");
     }
-
     cleanupPlaybackAndStream();
 
     const SpeechRecognitionCtor =
@@ -311,27 +319,47 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
     }
 
     const recognition = new SpeechRecognitionCtor();
-    recognition.continuous = false;
-    recognition.interimResults = false;
+    recognition.continuous = true;
+    recognition.interimResults = true;
     recognition.lang = "en-US";
 
-    recognition.onresult = async (event: CustomSpeechRecognitionEvent) => {
-      const result = event.results[event.resultIndex];
-      if (!result.isFinal) return;
+    accumulatedTranscriptRef.current = "";
 
-      const transcript = result[0].transcript.trim();
-      if (!transcript) return;
+    recognition.onresult = (event: CustomSpeechRecognitionEvent) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        if (event.results[i].isFinal) {
+          accumulatedTranscriptRef.current += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      // Show live transcript as user speaks
+      setText(accumulatedTranscriptRef.current + interim);
+    };
 
-      setText(transcript);
-      await sendTranscriptToAPI(transcript);
+    recognition.onend = () => {
+      setIsRecording(false);
+      recognitionRef.current = null;
+      const finalTranscript = accumulatedTranscriptRef.current.trim();
+      accumulatedTranscriptRef.current = "";
+      if (finalTranscript) {
+        void sendTranscriptToAPI(finalTranscript);
+      }
     };
 
     recognition.onerror = (event: Event & { error: string }) => {
       console.error("Speech recognition error:", event.error);
+      setIsRecording(false);
+      recognitionRef.current = null;
+      accumulatedTranscriptRef.current = "";
     };
 
     recognition.start();
+    recognitionRef.current = recognition;
+    setIsRecording(true);
   }, [
+    isRecording,
     cleanupPlaybackAndStream,
     isConnected,
     sendTranscriptToAPI,
@@ -341,6 +369,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
 
   useEffect(() => {
     return () => {
+      recognitionRef.current?.stop();
       if (socket) {
         socket.off("audioChunk");
         socket.off("audioComplete");
@@ -352,6 +381,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
 
   return {
     handleOnRecord,
+    isRecording,
     isConnected,
     isCrisis,
     dismissCrisis,
