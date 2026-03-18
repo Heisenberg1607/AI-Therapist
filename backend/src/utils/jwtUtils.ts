@@ -1,7 +1,11 @@
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = "_Atharva$Kurumbhatte@123_"  // this is a secret key for json web token
+const JWT_SECRET = process.env.JWT_SECRET || ""; // this is a secret key for json web token
 const JWT_EXPIRATION = "3d";
+
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET is not set in environment variables");
+}
 
 interface JwtPayload {
   userId: string;

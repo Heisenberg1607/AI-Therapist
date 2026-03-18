@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Phone } from 'lucide-react';
 import React, {useEffect, useRef} from 'react'
 import { useCallContext } from "@/app/context/callContext";
+ 
 
 interface AICallWindowProps {
   onEnd: () => void;
@@ -17,21 +18,15 @@ const AICallWindow: React.FC<AICallWindowProps> = ({ onEnd , sessionStarted}) =>
     useEffect(() => {
       if (sessionStarted) {
         if (!audioRef.current) {
-          console.log("session started", sessionStarted);
           audioRef.current = new Audio(
-            "http://localhost:5001/audio/b2a0d62b-be91-430f-9846-f5d83a59788c.mp3"
+            "http://localhost:5001/audio/398d9e9e-2e99-44ba-b66e-c3d4fffba018.mp3",
           );
           audioRef.current
             .play()
-            .then(() => {
-              console.log("Welcome audio playing");
-            })
-            .catch((error) => {
-              console.error("Audio playback failed:", error);
-            });
+            .then(() => console.log("Welcome audio playing"))
+            .catch((error) => console.error("Audio playback failed:", error));
         }
       } else {
-        console.log("session ended", sessionStarted);
         if (audioRef.current) {
           audioRef.current.pause();
           audioRef.current.currentTime = 0;

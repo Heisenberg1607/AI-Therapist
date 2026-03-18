@@ -115,7 +115,10 @@ export const sendMessage = async (
   return response.json();
 };
 
-export const getWelcomeMessage = async (): Promise<{ message: string }> => {
+export const getWelcomeMessage = async (): Promise<{
+  message: string;
+  audio: string;
+}> => {
   const response = await fetch(`${API_BASE_URL}/welcomeMessage`, {
     headers: getAuthHeaders(),
   });
