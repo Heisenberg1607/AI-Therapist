@@ -1,15 +1,45 @@
-# AI Therapist
+# MindStudio — AI Therapy Assistant
 
-A real-time AI therapy assistant using voice conversations powered by OpenAI GPT-4o-mini and ElevenLabs TTS.
+A real-time AI therapy assistant that lets users have voice-based conversations with an AI therapist. The AI listens, responds with synthesized speech, and detects crisis situations automatically.
+
+**Live Demo:** https://ai-therapist-tau.vercel.app
 
 ---
 
-## Local Development
+## Features
+
+- Push-to-talk voice recording with live transcript
+- Real-time audio streaming via WebSockets (Socket.IO)
+- AI responses powered by OpenAI GPT-4o-mini
+- Natural voice synthesis via ElevenLabs TTS
+- JWT-based authentication (register / login)
+- Crisis detection with automatic intervention modal
+- Interrupt AI mid-response
+- Rate limiting (3 messages per 10 seconds)
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, shadcn/ui |
+| Backend | Express 5, Socket.IO 4, TypeScript |
+| AI | OpenAI GPT-4o-mini |
+| Text-to-Speech | ElevenLabs `eleven_flash_v2_5` |
+| Database | PostgreSQL (Supabase), Prisma ORM |
+| Auth | JWT (3-day expiry) |
+| Deployment | Frontend → Vercel, Backend → Render |
+
+---
+
+## Running Locally
 
 ### Prerequisites
 
 - Node.js 20+
-- PostgreSQL database (e.g. [Supabase](https://supabase.com))
+- A PostgreSQL database — free tier on [Supabase](https://supabase.com) works perfectly
+- API keys for: OpenAI, ElevenLabs
 
 ### 1. Clone the repo
 
@@ -18,88 +48,115 @@ git clone <repo-url>
 cd ai-therapist
 ```
 
-### 2. Backend
+### 2. Set up the backend
 
 ```bash
 cd backend
-cp .env.example .env       # fill in your API keys and DATABASE_URL
-npm install
-npx prisma migrate dev     # run DB migrations
-npm run dev                # starts on http://localhost:5001
+cp .env.example .env
 ```
 
-### 3. Frontend
+Open `backend/.env` and fill in:
+
+```env
+DATABASE_URL=postgresql://<user>:<password>@<host>:6543/<db>?pgbouncer=true&connection_limit=1
+JWT_SECRET=any-long-random-string
+OPENAI_API_KEY=sk-...
+ELEVEN_LABS_API_KEY=sk-...
+PORT=5001
+FRONTEND_URL=http://localhost:3000
+```
+
+> Use port **6543** (PgBouncer) for `DATABASE_URL` — port 5432 will cause connection pool timeouts locally.
 
 ```bash
-cd frontend
-cp .env.example .env.local  # set NEXT_PUBLIC_API_URL=http://localhost:5001
 npm install
-npm run dev                  # starts on http://localhost:3000
+npx prisma migrate dev --schema=./src/prisma/schema.prisma
+npm run dev
 ```
+
+Backend runs at **http://localhost:5001**
+
+### 3. Set up the frontend
+
+```bash
+cd ../frontend
+cp .env.example .env.local
+```
+
+Open `frontend/.env.local` and set:
+
+```env
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
+NEXT_PUBLIC_WS_URL=http://localhost:5001
+```
+
+```bash
+npm install
+npm run dev
+```
+
+Frontend runs at **http://localhost:3000**
+
+### 4. Open the app
+
+Go to http://localhost:3000 → Register → Start Session → click the mic to talk.
 
 ---
 
-## Production with Docker
+## Running with Docker
 
 ### Prerequisites
 
-- Docker & Docker Compose
+- Docker and Docker Compose
 
-### 1. Configure environment files
+### Steps
 
 ```bash
-# Backend secrets
+# Fill in backend env
 cp backend/.env.example backend/.env
-# Edit backend/.env — fill in DATABASE_URL, API keys, JWT_SECRET, and set FRONTEND_URL to your frontend domain
+# Edit backend/.env with your API keys and DATABASE_URL
 
-# Frontend env
+# Fill in frontend env
 cp frontend/.env.example frontend/.env.local
-# Edit frontend/.env.local — set NEXT_PUBLIC_API_URL to your backend's public URL
-```
+# Edit frontend/.env.local:
+#   NEXT_PUBLIC_API_URL=http://localhost:5001/api
+#   NEXT_PUBLIC_WS_URL=http://localhost:5001
 
-### 2. Build and run
-
-```bash
+# Build and run
 docker-compose up --build -d
 ```
 
-The app will be available at:
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:5001`
-
-### 3. Stop
+- Frontend: http://localhost:3000
+- Backend: http://localhost:5001
+- Health check: http://localhost:5001/api/health
 
 ```bash
+# Stop
 docker-compose down
 ```
 
 ---
 
-## Deploying to a Cloud Platform
+## API Endpoints
 
-### Render / Railway / Fly.io (recommended)
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/register` | No | Create account |
+| `POST` | `/api/login` | No | Login, returns JWT |
+| `GET` | `/api/health` | No | Health check |
+| `POST` | `/api/startSession` | Bearer JWT | Create a new therapy session |
 
-Both services can be deployed separately:
+### WebSocket Events (Socket.IO)
 
-**Backend** (Node.js service):
-- Build command: `npm run build:prod`
-- Start command: `npm start` (runs `prisma migrate deploy` then starts the server)
-- Set all env vars from `backend/.env.example`
-- Set `FRONTEND_URL` to your deployed frontend URL
-
-**Frontend** (Next.js service):
-- Build command: `npm run build`
-- Start command: `npm start`
-- Set `NEXT_PUBLIC_API_URL` to your deployed backend URL at **build time**
-
-### Vercel (frontend only)
-
-```bash
-cd frontend
-npx vercel --prod
-```
-
-Set `NEXT_PUBLIC_API_URL` in the Vercel project environment variables.
+| Event | Direction | Description |
+|---|---|---|
+| `sendMessage` | Client → Server | Send user transcript + sessionId |
+| `audioChunk` | Server → Client | Streamed MP3 audio bytes |
+| `audioComplete` | Server → Client | Audio stream finished, includes AI text |
+| `audioError` | Server → Client | Error during processing |
+| `aiThinking` | Server → Client | AI is generating a response |
+| `crisisDetected` | Server → Client | Crisis keywords detected |
+| `interrupt` | Client → Server | Stop current AI audio stream |
 
 ---
 
@@ -107,31 +164,46 @@ Set `NEXT_PUBLIC_API_URL` in the Vercel project environment variables.
 
 ### Backend (`backend/.env`)
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Secret for signing JWTs (use a long random string) |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `ELEVEN_LABS_API_KEY` | ElevenLabs API key |
-| `ELEVENLABS_VOICE_ID` | ElevenLabs voice ID |
-| `PORT` | Server port (default: `5001`) |
-| `FRONTEND_URL` | Deployed frontend URL for CORS (e.g. `https://yourapp.com`) |
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string (use port 6543 for Supabase) |
+| `JWT_SECRET` | Yes | Secret for signing JWTs |
+| `OPENAI_API_KEY` | Yes | OpenAI API key |
+| `ELEVEN_LABS_API_KEY` | Yes | ElevenLabs API key |
+| `PORT` | No | Server port (default: `5001`) |
+| `FRONTEND_URL` | Yes | Frontend origin for CORS (e.g. `https://yourapp.vercel.app`) |
 
 ### Frontend (`frontend/.env.local`)
 
-| Variable | Description |
-|---|---|
-| `NEXT_PUBLIC_API_URL` | Backend URL for REST + WebSocket (e.g. `https://api.yourapp.com`) |
+| Variable | Required | Description |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | Yes | Backend REST URL including `/api` (e.g. `http://localhost:5001/api`) |
+| `NEXT_PUBLIC_WS_URL` | Yes | Backend WebSocket root URL without `/api` (e.g. `http://localhost:5001`) |
 
 ---
 
-## Tech Stack
+## Project Structure
 
-| Layer | Technology |
-|---|---|
-| Frontend | Next.js 15 (App Router), React 19, Tailwind CSS, shadcn/ui |
-| Backend | Express 5, Socket.IO 4, TypeScript |
-| AI | OpenAI GPT-4o-mini |
-| TTS | ElevenLabs `eleven_flash_v2_5` |
-| Database | PostgreSQL via Supabase, Prisma ORM |
-| Auth | JWT |
+```
+ai-therapist/
+├── backend/
+│   ├── src/
+│   │   ├── Controller/     # Route handlers (auth, session)
+│   │   ├── Model/          # Prisma DB helpers (user, session, message)
+│   │   ├── Routes/         # Express router
+│   │   ├── Service/        # OpenAI + ElevenLabs integration
+│   │   ├── middleware/      # JWT auth middleware
+│   │   ├── prisma/         # Prisma schema + client
+│   │   ├── utils/          # JWT helpers
+│   │   └── server.ts       # Express + Socket.IO entrypoint
+│   └── Dockerfile
+├── frontend/
+│   ├── src/app/
+│   │   ├── UI/             # Page-level components (chat windows, navbar)
+│   │   ├── hooks/          # useWebSocket, useUserCallWindow
+│   │   ├── context/        # Auth + call context
+│   │   ├── lib/            # API client, auth helpers
+│   │   └── chat/           # Chat page
+│   └── Dockerfile
+└── docker-compose.yml
+```
