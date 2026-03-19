@@ -2,6 +2,8 @@ import dotenv from "dotenv";
 import { OpenAI } from "openai";
 import { therapistTools } from "./therapistFunctions";
 import { executeFunction } from "./functionExecutors";
+import { GPTResponseSchema } from "../schemas/aiSchemas";
+import { DetectCrisisArgsSchema } from "../schemas/toolSchemas";
 
 dotenv.config();
 
@@ -93,7 +95,13 @@ When appropriate, use your available tools to log emotions, save important notes
 
     // Case 1: Normal text response
     if (choice.finish_reason === "stop") {
-      return choice.message.content ?? "";
+      const raw = choice.message.content ?? "";
+      const validated = GPTResponseSchema.safeParse(raw);
+      if (!validated.success) {
+        console.warn("⚠️ [GPT] Invalid response:", validated.error.message);
+        return "";
+      }
+      return validated.data;
     }
 
     // Case 2: Function call requested
@@ -104,7 +112,25 @@ When appropriate, use your available tools to log emotions, save important notes
       for (const toolCall of toolCalls) {
         if (toolCall.type !== "function") continue;
         const functionName = toolCall.function.name;
-        const functionArgs = JSON.parse(toolCall.function.arguments);
+        let functionArgs: Record<string, unknown>;
+        try {
+          functionArgs = JSON.parse(toolCall.function.arguments);
+        } catch {
+          console.error(`❌ [AI] Failed to parse args for ${functionName}`);
+          continue;
+        }
+
+        if (functionName === "detect_crisis_intent") {
+          const parsed = DetectCrisisArgsSchema.safeParse(functionArgs);
+          if (!parsed.success) {
+            console.error(
+              `❌ [AI] Invalid args for ${functionName}:`,
+              parsed.error.message,
+            );
+            continue;
+          }
+          functionArgs = parsed.data;
+        }
 
         console.log(
           `🔧 [AI] Executing function: ${functionName}`,
@@ -144,7 +170,13 @@ When appropriate, use your available tools to log emotions, save important notes
         temperature: 1.0,
       });
 
-      return secondResponse.choices[0].message.content ?? "";
+      const secondRaw = secondResponse.choices[0].message.content ?? "";
+      const secondValidated = GPTResponseSchema.safeParse(secondRaw);
+      if (!secondValidated.success) {
+        console.warn("⚠️ [GPT] Invalid second response:", secondValidated.error.message);
+        return "";
+      }
+      return secondValidated.data;
     }
 
     return "";

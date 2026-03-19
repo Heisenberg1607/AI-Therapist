@@ -1,35 +1,50 @@
 import { prisma } from "../prisma/prismaClient";
+import { DetectCrisisArgsSchema } from "../schemas/toolSchemas";
 
 interface FunctionResult {
   status: "success" | "error" | "cancelled";
   result?: unknown;
   error?: string;
 }
+
 export const executeFunction = async (
   name: string,
   args: Record<string, unknown>,
   userId: string,
-    sessionId: string,
+  sessionId: string,
   onCrisisDetected: () => void,
 ): Promise<FunctionResult> => {
   try {
     switch (name) {
       case "detect_crisis_intent": {
-        // Flag session in DB
+        const parsed = DetectCrisisArgsSchema.safeParse(args);
+        if (!parsed.success) {
+          console.error(
+            `❌ [FUNCTION] Invalid args for detect_crisis_intent:`,
+            parsed.error.message,
+          );
+          return { status: "error", error: `Invalid args: ${parsed.error.message}` };
+        }
+
+        const { severity, keywords } = parsed.data;
+
         await prisma.session.update({
           where: { id: sessionId },
-          data: { crisisFlag: true }, // add this 
-          // field to schema
+          data: { crisisFlag: true },
         });
+
         onCrisisDetected();
-        // You could also: send alert email, notify admin, etc.
+
         console.error(
-          `🚨 CRISIS DETECTED for user ${userId}: ${JSON.stringify(args)}`,
+          `🚨 CRISIS DETECTED for user ${userId} — severity: ${severity}, keywords: [${keywords.join(", ")}]`,
         );
+
         return {
           status: "success",
           result: {
             flagged: true,
+            severity,
+            keywords,
             resources: [
               "988 Suicide & Crisis Lifeline (call or text 988)",
               "Crisis Text Line (text HOME to 741741)",
@@ -39,7 +54,7 @@ export const executeFunction = async (
           },
         };
       }
-      
+
       default:
         return { status: "error", error: `Unknown function: ${name}` };
     }

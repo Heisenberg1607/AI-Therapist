@@ -2,6 +2,7 @@
 
 import { ElevenLabsClient } from "@elevenlabs/elevenlabs-js";
 import dotenv from "dotenv";
+import { ElevenLabsInputSchema } from "../schemas/aiSchemas";
 
 // Load env at module level
 dotenv.config();
@@ -27,6 +28,13 @@ export const streamSpeechWithElevenLabs = async (
   onComplete: () => void,
   onError: (error: Error) => void,
 ) => {
+  const inputValidation = ElevenLabsInputSchema.safeParse(text);
+  if (!inputValidation.success) {
+    console.error("❌ [ELEVENLABS] Invalid input:", inputValidation.error.message);
+    onError(new Error(`Invalid TTS input: ${inputValidation.error.message}`));
+    return;
+  }
+
   console.log("🎙️ [ELEVENLABS] Initializing client...");
 
   try {
