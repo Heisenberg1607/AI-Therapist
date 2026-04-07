@@ -30,3 +30,10 @@ export const verifyPassword = async (
 ) => {
   return await bcrypt.compare(plainPassword, hashedPassword);
 };
+
+export const getUserById = async (userId: string) => {
+  return await prisma.user.findUnique({
+    where: { id: userId },
+    select: {id: true, email: true, name: true}
+  })
+}

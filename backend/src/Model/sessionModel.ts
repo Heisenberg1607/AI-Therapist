@@ -15,4 +15,4 @@ export const getSessionById = async (sessionId: string) => {
     where: { id: sessionId },
     include: { messages: true },
   });
-};
+}; 

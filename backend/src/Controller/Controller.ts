@@ -5,10 +5,18 @@ import { AIgenerateResponse } from "../Service/Service";
 // import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
 import { Sender } from "@prisma/client";
 import { createMessage, getMessagesBySession } from "../Model/messageModel";
-import { createSession } from "../Model/sessionModel";
+import { createSession, getSessionById } from "../Model/sessionModel";
 import { AuthRequest } from "../middleware/authMiddleware";
-import { createUser, findUserByEmail, verifyPassword } from "../Model/userModel";
+import { createUser, findUserByEmail, verifyPassword, getUserById } from "../Model/userModel";
+
 import { generateToken } from "../utils/jwtUtils";
+import { DeepgramClient } from "@deepgram/sdk";
+
+// import { AuthRequest } from "../middleware/authMiddleware";
+
+export type AuthRequestWithFile = AuthRequest & {
+  file?: Express.Multer.File;
+};
 
 
 export const login = async (req: Request, res: Response) => {
@@ -88,6 +96,60 @@ export const startSession = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: "Failed to start session" });
   }
 };
+
+export const resumeSession = async (req: AuthRequest, res: Response) => {
+  try {
+    const { sessionId } = req.body as { sessionId?: string };
+    
+    if (!sessionId) {
+      return res.status(400).json({ message: "Session ID is req" });
+    }
+
+    const session = await getSessionById(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    if (session?.userId !== req.userId) {
+      return res
+        .status(403)
+        .json({ message: "Unauthorized to resume the session." });
+    }
+    const messages = await getMessagesBySession(sessionId);
+
+    if(!messages) {
+      return res.status(404).json({ message: "Messages not found" });
+    }
+
+    return res.status(200).json({ sessionId: session.id , messages: messages});
+
+
+  } catch (error) {
+    console.error("error in resumeSession", error);
+  }
+
+}
+
+export const getMe = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId;
+    if (!userId) return res.status(401).json({ message: "unauthorized" });
+
+    const user = await getUserById(userId);
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    return res.status(200).json({ user });
+
+  } catch (error) {
+    console.log("getMe error", error);
+    return res.status(500).json({ message: "Failed to fetch user" });
+  }
+}
+
+
+
+
 
 // export const generateResponse = async (
 //   req: Request,

@@ -4,6 +4,8 @@ import { Card } from "@/components/ui/card";
 import { Mic, MicOff } from "lucide-react";
 import CrisisModal from "@/app/UI/UserCallWindow/CrisisModal";
 import { useUserCallWindow } from "@/app/hooks/useUserCallWindow";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 interface UserCallWindowProps {
   sessionStarted: boolean;
@@ -11,9 +13,12 @@ interface UserCallWindowProps {
 }
 
 const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
-  const { handleOnRecord, isRecording, isConnected, isCrisis, dismissCrisis } =
+  const { handleOnRecord, isRecording, isConnected, isCrisis, dismissCrisis, connectionStatus, handleMessage } =
     useUserCallWindow({ sessionId });
 
+  const [message, setMessage] = useState("");
+
+  
   return (
     <>
       {isCrisis && <CrisisModal onDismiss={dismissCrisis} />}
@@ -54,7 +59,7 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
             </span>
           </div>
 
-          {sessionStarted && !isCrisis ? (
+          {sessionStarted && !isCrisis && connectionStatus === "connected" ? (
             <Button
               onClick={handleOnRecord}
               className={
@@ -67,11 +72,21 @@ const UserCallWindow = ({ sessionStarted, sessionId }: UserCallWindowProps) => {
             </Button>
           ) : (
             <Button disabled>
+              <span>
+                {connectionStatus === "connecting" && "connecting..."}
+                {connectionStatus === "disconnected" && "disconnected"}
+              </span>
+
               <MicOff />
             </Button>
           )}
         </div>
       </Card>
+
+      <div>
+        <Input value={message} onChange={(e) => { setMessage(e.target.value) }} className= "border-white text-white"/>
+        <Button onClick={() => handleMessage(message)} className="text-white"> Send</Button>
+      </div>
     </>
   );
 };

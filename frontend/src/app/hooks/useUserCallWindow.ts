@@ -14,7 +14,7 @@ type AudioChunkPayload = Uint8Array | ArrayBuffer | number[] | unknown;
 
 export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
   const { setText, setIsProcessing } = useCallContext();
-  const { socket, isConnected, isCrisis, dismissCrisis } = useWebSocket();
+  const { socket, isConnected, isCrisis, dismissCrisis, connectionStatus } = useWebSocket();
 
   const [isRecording, setIsRecording] = useState(false);
 
@@ -355,17 +355,60 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
       accumulatedTranscriptRef.current = "";
     };
 
+    
+
     recognition.start();
     recognitionRef.current = recognition;
     setIsRecording(true);
-  }, [
+  }
+    
+    , [
     isRecording,
     cleanupPlaybackAndStream,
     isConnected,
     sendTranscriptToAPI,
     setText,
     socket,
-  ]);
+    ]);
+  
+  const handleMessage = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || !sessionId || isCrisis) {
+        return;
+      }
+
+      //interruption handling
+      if (isRecording) {
+        recognitionRef.current?.stop();
+      }
+
+      if (socket && isConnected) {
+        socket.emit("interrupt");
+      }
+
+      if (socket) {
+        socket.off("audioChunk");
+        socket.off("audioComplete");
+        socket.off("audioError");
+      }
+      
+      cleanupPlaybackAndStream();
+      setText(trimmed);
+      await sendTranscriptToAPI(trimmed);
+    },
+    [
+      cleanupPlaybackAndStream,
+      isConnected,
+      isCrisis,
+      isRecording,
+      sendTranscriptToAPI,
+      sessionId,
+      setText,
+      socket,
+    ],
+  );
+  
 
   useEffect(() => {
     return () => {
@@ -385,5 +428,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
     isConnected,
     isCrisis,
     dismissCrisis,
+    connectionStatus,
+    handleMessage
   };
 };

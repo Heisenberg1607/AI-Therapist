@@ -2,9 +2,10 @@ import express,{Router} from "express";
 
 // import { generateResponse } from "../Controller/Controller"
 // import { getWelcomeMessage } from "../Controller/Controller";
-import { startSession } from "../Controller/Controller";
-import { login , register } from "../Controller/Controller";
+import { startSession, resumeSession } from "../Controller/Controller";
+import { login , register, getMe } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
+
 
 const router: Router = express.Router();
 
@@ -26,6 +27,24 @@ router.post("/startSession", authenticate, async (req, res, next) => {
     next(error);
   }
 });
+
+router.post("/resumeSession", authenticate, async (req, res, next) => {
+  try {
+    await resumeSession(req, res);
+  } catch (error) {
+    next(error);
+  }
+})
+
+router.get("/me", authenticate, async (req, res, next) => {
+   try {
+     await getMe(req, res);
+   } catch (error) {
+     next(error);
+   }
+})
+
+
 
 // Chat response route (protected)
 // router.post("/getResponse", authenticate, async (req, res, next) => {

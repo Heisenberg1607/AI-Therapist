@@ -11,7 +11,7 @@ import {
   register as registerApi,
   logout as logoutApi,
 } from "../lib/api";
-import { getToken, setToken, removeToken } from "../lib/auth";
+import { getToken, setToken, removeToken, getAuthHeaders } from "../lib/auth";
 
 interface User {
   id: string;
@@ -45,18 +45,44 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Initialize auth state from localStorage on mount
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       const storedToken = getToken();
-      if (storedToken) {
-        setTokenState(storedToken);
-        // Optionally: validate token and fetch user info
-        // For now, we'll just mark as authenticated
-        // You can add a /api/me endpoint to fetch user details
+
+      if (!storedToken) {
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+
+      setTokenState(storedToken);
+
+      try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+        if (!API_BASE_URL) throw new Error("Missing NEXT_PUBLIC_API_URL");
+
+        const response = await fetch(`${API_BASE_URL}/me`, {
+          method: "GET",
+          headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+          removeToken();
+          setTokenState(null);
+          setUser(null);
+          return;
+        }
+
+        const data = await response.json(); // { user }
+        setUser(data.user);
+      } catch {
+        removeToken();
+        setTokenState(null);
+        setUser(null);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    initializeAuth();
+    void initializeAuth();
   }, []);
 
   const login = async (email: string, password: string) => {

@@ -10,7 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "types": ["node"],
+    "types": ["node", "multer"],
     "typeRoots": ["./node_modules/@types"]
   },
   "include": ["src/**/*"],
