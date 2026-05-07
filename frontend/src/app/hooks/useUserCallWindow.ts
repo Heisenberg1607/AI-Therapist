@@ -13,7 +13,7 @@ type UseUserCallWindowParams = {
 type AudioChunkPayload = Uint8Array | ArrayBuffer | number[] | unknown;
 
 export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
-  const { setText, setIsProcessing } = useCallContext();
+  const { setText, setIsProcessing, setIsAudioPlaying } = useCallContext();
   const { socket, isConnected, isCrisis, dismissCrisis } = useWebSocket();
 
   const [isRecording, setIsRecording] = useState(false);
@@ -59,7 +59,8 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
     queueRef.current = [];
     audioChunksRef.current = [];
     isPlayingRef.current = false;
-  }, []);
+    setIsAudioPlaying(false);
+  }, [setIsAudioPlaying]);
 
   const initializeMediaSource = useCallback((): Promise<void> => {
     return new Promise((resolve, reject) => {
@@ -73,6 +74,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
 
         const audio = new Audio();
         audio.src = URL.createObjectURL(mediaSource);
+        audio.onended = () => setIsAudioPlaying(false);
         audioRef.current = audio;
 
         mediaSource.addEventListener("sourceopen", () => {
@@ -128,10 +130,13 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
         }
 
         audioRef.current = new Audio(data.audio);
+        audioRef.current.onended = () => setIsAudioPlaying(false);
+        setIsAudioPlaying(true);
         await audioRef.current.play();
       } catch (error) {
         console.error("Failed to send transcript:", error);
         setIsProcessing(false);
+        setIsAudioPlaying(false);
 
         if (
           error instanceof Error &&
@@ -141,7 +146,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
         }
       }
     },
-    [sessionId, setIsProcessing, setText],
+    [sessionId, setIsProcessing, setIsAudioPlaying, setText],
   );
 
   const sendViaWebSocket = useCallback(
@@ -200,6 +205,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
               ?.play()
               .then(() => {
                 isPlayingRef.current = true;
+                setIsAudioPlaying(true);
               })
               .catch((err) => console.error("Play error:", err));
           }
@@ -211,6 +217,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
       const handleAudioError = (error: { message: string }) => {
         console.error("Streaming error:", error.message);
         setIsProcessing(false);
+        setIsAudioPlaying(false);
         alert("Error: " + error.message);
 
         if (audioRef.current) {
@@ -259,6 +266,7 @@ export const useUserCallWindow = ({ sessionId }: UseUserCallWindowParams) => {
       sendViaHTTP,
       sessionId,
       setIsProcessing,
+      setIsAudioPlaying,
       setText,
       socket,
       toExactArrayBuffer,
