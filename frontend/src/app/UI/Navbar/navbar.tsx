@@ -1,23 +1,10 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { useAuth } from "@/app/context/authContext";
 
 export default function Navbar() {
   const { user, isAuthenticated, logout, isLoading } = useAuth();
-  const pathname = usePathname();
-
-  const navItems = [
-    { href: "/", label: "Home" },
-    { href: "/about", label: "About" },
-    { href: "/resources", label: "Resources" },
-    { href: "/faq", label: "FAQ" },
-  ];
-
-  if (isAuthenticated) {
-    navItems.push({ href: "/dashboard", label: "Dashboard" });
-  }
 
   return (
     <div className="w-full fixed top-0 z-50 bg-black/30 backdrop-blur-md border-b border-white/10">
@@ -28,25 +15,6 @@ export default function Navbar() {
         >
           AI Therapist
         </Link>
-
-        <nav className="hidden md:flex items-center gap-1 lg:gap-2">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-3 py-2 rounded-md text-sm transition-colors ${
-                  isActive
-                    ? "text-green-400 bg-white/10"
-                    : "text-white hover:text-green-400 hover:bg-white/5"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
 
         <div className="flex items-center gap-2 sm:gap-3 ml-auto">
           {isLoading ? (
