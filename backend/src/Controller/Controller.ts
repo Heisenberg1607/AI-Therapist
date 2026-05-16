@@ -9,6 +9,7 @@ import { createSession } from "../Model/sessionModel";
 import { AuthRequest } from "../middleware/authMiddleware";
 import { createUser, findUserByEmail, verifyPassword } from "../Model/userModel";
 import { generateToken } from "../utils/jwtUtils";
+import { logger } from "../utils/logger";
 
 
 export const login = async (req: Request, res: Response) => {
@@ -80,11 +81,27 @@ export const register = async (req: Request, res: Response) => {
 export const startSession = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId;
-    
-    const session = await createSession(userId); // From the middleware
+
+    const session = await createSession(userId);
+
+    // Layer 3 — Runtime: session created via HTTP
+    logger.info(
+      {
+        layer: "runtime",
+        event: "session.started",
+        sessionId: session.id,
+        turnId: "",
+        userId,
+      },
+      "Session started",
+    );
+
     res.status(201).json({ sessionId: session.id });
   } catch (error) {
-    console.error("Error starting session:", error);
+    logger.error(
+      { layer: "runtime", event: "session.started", sessionId: "", turnId: "", err: error },
+      "Failed to start session",
+    );
     res.status(500).json({ message: "Failed to start session" });
   }
 };
