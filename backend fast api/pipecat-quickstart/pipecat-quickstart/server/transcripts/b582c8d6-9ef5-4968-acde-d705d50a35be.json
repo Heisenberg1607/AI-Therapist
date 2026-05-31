@@ -1,0 +1,25 @@
+{
+  "session_id": "b582c8d6-9ef5-4968-acde-d705d50a35be",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T00:55:44.765613+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Welcome to our session, I'm so glad you're here. Can you start by telling me a bit about what's been on your mind lately and why you wanted to talk?\"",
+      "timestamp": "2026-05-31T00:56:01.209340+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I've been super stressed lately about financial stress and relationship stress. There's a lot of going on lately.",
+      "timestamp": "2026-05-31T00:56:01.280858+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Yeah, that sounds like a lot to handle. How long have you been feeling this way, and what's been the most overwhelming part of it for you?\"",
+      "timestamp": "2026-05-31T00:56:09.053609+00:00"
+    }
+  ]
+}
