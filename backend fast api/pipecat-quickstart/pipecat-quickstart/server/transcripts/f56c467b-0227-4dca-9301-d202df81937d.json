@@ -1,0 +1,25 @@
+{
+  "session_id": "f56c467b-0227-4dca-9301-d202df81937d",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T00:05:02.616501+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Hey there, I'm so glad you're here to talk. Can you start by telling me a little bit about what brings you in today?\"",
+      "timestamp": "2026-05-31T00:05:15.592252+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Mainly some stress about my relationship.",
+      "timestamp": "2026-05-31T00:05:15.710218+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Relationship stress can be really tough to deal with. What's been going on with your relationship that's been causing you stress lately?\"",
+      "timestamp": "2026-05-31T00:05:22.841025+00:00"
+    }
+  ]
+}

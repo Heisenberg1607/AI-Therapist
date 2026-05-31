@@ -1,0 +1,25 @@
+{
+  "session_id": "d4049789-a674-4bbf-a164-4cee11cd9c58",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-30T23:47:49.801159+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Welcome to our session today! I'm here to listen and support you in any way I can. What's been on your mind lately, and how are you feeling about coming in today?\"",
+      "timestamp": "2026-05-30T23:50:40.386065+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Yep.",
+      "timestamp": "2026-05-30T23:50:40.511980+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"That sounds a bit uncertain. Can you tell me a bit more about what's been going on that's got you feeling that way?\"",
+      "timestamp": "2026-05-30T23:50:48.742293+00:00"
+    }
+  ]
+}

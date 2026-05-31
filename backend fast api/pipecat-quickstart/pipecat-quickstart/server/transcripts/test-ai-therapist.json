@@ -1,0 +1,51 @@
+{
+  "session_id": "test-session-sonia",
+  "turns": [
+    { "role": "user", "content": "Hey" },
+    {
+      "role": "assistant",
+      "content": "Hey! Good to see you back. What's going on?"
+    },
+    {
+      "role": "user",
+      "content": "I am a bit stressed lately because of the financial stress and job search"
+    },
+    {
+      "role": "assistant",
+      "content": "Yeah, that combo is relentless. Last time you mentioned you had a couple of interviews lined up — how did those go?"
+    },
+    {
+      "role": "user",
+      "content": "They were good. Haven't heard back. What's causing stress is mainly the financial stress."
+    },
+    {
+      "role": "assistant",
+      "content": "Good that they went well, even if the waiting is tough. When you say financial stress, how tight are we actually talking right now? Like do you have a sense of how much runway you have before things get really pressing?"
+    },
+    {
+      "role": "user",
+      "content": "I have till December. Then its a real pressure. Its June right now"
+    },
+    {
+      "role": "assistant",
+      "content": "That's actually more runway than the stress is probably making it feel like. Six months is real time to work with. The pressure your brain is generating right now seems disproportionate to the actual deadline — which doesn't mean the stress isn't real, but it might mean your nervous system is treating this like a fire when it's more like a slow burn you can actually manage."
+    },
+    { "role": "user", "content": "Idk about that" },
+    {
+      "role": "assistant",
+      "content": "What makes it feel more urgent than that?"
+    },
+    {
+      "role": "user",
+      "content": "I have one month to get a job else I'll have to go back to my town. I am in SF searching"
+    },
+    {
+      "role": "assistant",
+      "content": "Okay, that's a completely different picture than I had. Staying in SF is the actual deadline, not December. That's real urgency and you were right to push back."
+    },
+    {
+      "role": "assistant",
+      "content": "So the question becomes what actually moves the needle in the next four weeks. The OpenAI referral, the interviews you just had, the follow-ups from yesterday's meetup — those are the live threads right now. Which of those feels closest to something you can actually act on today?"
+    }
+  ]
+}

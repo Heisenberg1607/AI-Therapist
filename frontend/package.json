@@ -10,6 +10,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@daily-co/realtime-ai-daily": "^0.2.3",
+    "@pipecat-ai/client-js": "^1.10.0",
+    "@pipecat-ai/client-react": "^1.6.0",
+    "@pipecat-ai/small-webrtc-transport": "^1.10.3",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-navigation-menu": "^1.2.13",
@@ -26,6 +30,9 @@
     "next": "^15.5.12",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "realtime-ai": "^0.2.2",
+    "realtime-ai-react": "^0.2.2",
+    "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.3.1"
   },

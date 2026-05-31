@@ -1,0 +1,100 @@
+{
+  "session_id": "e5d73ba3-532f-4b9e-a714-ff26b538e8ad",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-30T23:55:01.560444+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hello.",
+      "timestamp": "2026-05-30T23:55:06.661031+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It's so great that you've taken this first step to talk about what's been going on. Can you tell me a bit about what brings you here today?",
+      "timestamp": "2026-05-30T23:55:28.333487+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It's nice to meet you. What's been on your mind lately that made you want to reach out and talk?",
+      "timestamp": "2026-05-30T23:55:28.392261+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Quite stressful quite stressful lately, and it's been good. Are you recording?",
+      "timestamp": "2026-05-30T23:55:30.496439+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I was just testing out the voice here.",
+      "timestamp": "2026-05-30T23:55:30.553643+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "No",
+      "timestamp": "2026-05-30T23:55:31.459908+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Yeah.",
+      "timestamp": "2026-05-30T23:55:31.518393+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "So it was just you a test. were just testing That",
+      "timestamp": "2026-05-30T23:55:37.538212+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Oh, of course. I would like to show if you wanna test it.",
+      "timestamp": "2026-05-30T23:55:37.596467+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Go ahead, I'm here to listen.",
+      "timestamp": "2026-05-30T23:55:39.873666+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hey. Well,",
+      "timestamp": "2026-05-30T23:55:39.944936+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It sounds like",
+      "timestamp": "2026-05-30T23:55:41.085734+00:00"
+    },
+    {
+      "role": "user",
+      "content": "as",
+      "timestamp": "2026-05-30T23:55:41.141692+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "it seems",
+      "timestamp": "2026-05-30T23:55:42.036852+00:00"
+    },
+    {
+      "role": "user",
+      "content": "long black",
+      "timestamp": "2026-05-30T23:55:42.092138+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "coffee. Can you tell me a bit",
+      "timestamp": "2026-05-30T23:55:44.897524+00:00"
+    },
+    {
+      "role": "user",
+      "content": "yeah. Yeah.",
+      "timestamp": "2026-05-30T23:55:45.061751+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "it seems like you're feeling a bit hesitant to open up. Is that right?",
+      "timestamp": "2026-05-30T23:55:49.846073+00:00"
+    }
+  ]
+}

@@ -1,14 +1,29 @@
 import { getAuthHeaders, removeToken } from "./auth";
+import type { OnboardingAnswers } from "@/lib/buildSystemPrompt";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  name?: string;
+  onboarded?: boolean;
+  onboardingData?: OnboardingAnswers | null;
+}
+
+export interface DbSession {
+  id: string;
+  createdAt: string;
+  summary: string | null;
+  mood: string | null;
+  topic: string | null;
+  durationSec: number | null;
+  crisisFlag: boolean;
+}
+
 interface LoginResponse {
   message: string;
-  user: {
-    id: string;
-    email: string;
-    name?: string;
-  };
+  user: AuthUser;
   token: string;
 }
 
@@ -113,6 +128,55 @@ export const sendMessage = async (
   }
 
   return response.json();
+};
+
+// Fetch the current user (incl. onboarding state). Returns null if unauthorized.
+export const getMe = async (): Promise<AuthUser | null> => {
+  const response = await fetch(`${API_BASE_URL}/me`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) removeToken();
+    return null;
+  }
+  const data = await response.json();
+  return data.user as AuthUser;
+};
+
+// Persist onboarding answers + flag for the user.
+export const completeOnboarding = async (
+  answers: OnboardingAnswers,
+): Promise<AuthUser | null> => {
+  const response = await fetch(`${API_BASE_URL}/onboarding`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ answers }),
+  });
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.user as AuthUser;
+};
+
+// Save a session's summary + metadata to the DB.
+export const saveSessionSummary = async (
+  sessionId: string,
+  payload: { summary: string; mood: string; topic: string; durationSec: number },
+): Promise<void> => {
+  await fetch(`${API_BASE_URL}/sessions/${sessionId}/summary`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify(payload),
+  });
+};
+
+// Fetch all past sessions for the dashboard.
+export const getSessionsApi = async (): Promise<DbSession[]> => {
+  const response = await fetch(`${API_BASE_URL}/sessions`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) return [];
+  const data = await response.json();
+  return Array.isArray(data.sessions) ? (data.sessions as DbSession[]) : [];
 };
 
 // export const getWelcomeMessage = async (): Promise<{

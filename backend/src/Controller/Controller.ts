@@ -5,9 +5,19 @@ import { AIgenerateResponse } from "../Service/Service";
 // import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
 import { Sender } from "@prisma/client";
 import { createMessage, getMessagesBySession } from "../Model/messageModel";
-import { createSession } from "../Model/sessionModel";
+import {
+  createSession,
+  updateSessionSummary,
+  getSessionsByUser,
+} from "../Model/sessionModel";
 import { AuthRequest } from "../middleware/authMiddleware";
-import { createUser, findUserByEmail, verifyPassword } from "../Model/userModel";
+import {
+  createUser,
+  findUserByEmail,
+  verifyPassword,
+  getUserProfile,
+  setUserOnboarding,
+} from "../Model/userModel";
 import { generateToken } from "../utils/jwtUtils";
 import { logger } from "../utils/logger";
 
@@ -38,6 +48,8 @@ export const login = async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        onboarded: user.onboarded,
+        onboardingData: user.onboardingData,
       },
       token,
     })
@@ -103,6 +115,62 @@ export const startSession = async (req: AuthRequest, res: Response) => {
       "Failed to start session",
     );
     res.status(500).json({ message: "Failed to start session" });
+  }
+};
+
+// Return the authenticated user's profile incl. onboarding state.
+export const getMe = async (req: AuthRequest, res: Response) => {
+  try {
+    const user = await getUserProfile(req.userId!);
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("getMe error", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Mark the user onboarded and persist their answers.
+export const completeOnboarding = async (req: AuthRequest, res: Response) => {
+  try {
+    const { answers } = req.body;
+    const user = await setUserOnboarding(req.userId!, answers ?? {});
+    res.status(200).json({ user });
+  } catch (error) {
+    console.error("completeOnboarding error", error);
+    res.status(500).json({ message: "Failed to save onboarding" });
+  }
+};
+
+// Persist a session's AI summary + metadata (scoped to the owner).
+export const saveSessionSummary = async (req: AuthRequest, res: Response) => {
+  try {
+    const { sessionId } = req.params as { sessionId: string };
+    const { summary, mood, topic, durationSec } = req.body;
+    const count = await updateSessionSummary(sessionId, req.userId!, {
+      summary,
+      mood,
+      topic,
+      durationSec,
+    });
+    if (count === 0) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    console.error("saveSessionSummary error", error);
+    res.status(500).json({ message: "Failed to save summary" });
+  }
+};
+
+// List the user's past sessions for the dashboard.
+export const getSessions = async (req: AuthRequest, res: Response) => {
+  try {
+    const sessions = await getSessionsByUser(req.userId!);
+    res.status(200).json({ sessions });
+  } catch (error) {
+    console.error("getSessions error", error);
+    res.status(500).json({ message: "Failed to fetch sessions" });
   }
 };
 

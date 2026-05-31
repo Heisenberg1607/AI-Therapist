@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.cekura.ai)",
+      "WebSearch",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python -c \"import bot; print\\('BOT_IMPORT_OK'\\); print\\('run_bot' in dir\\(bot\\), 'ConversationPersister' in dir\\(bot\\)\\)\")"
+    ]
+  }
+}

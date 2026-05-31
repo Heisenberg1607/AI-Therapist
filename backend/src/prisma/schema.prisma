@@ -12,18 +12,24 @@ model User{
   email     String @unique
   password  String // will store hashed values
   name      String?
+  onboarded      Boolean @default(false)
+  onboardingData Json?   // stored onboarding answers, used to rebuild the prompt
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sessions  Session[]
 }
 
 model Session {
-  id        String     @id @default(uuid())
-  user      User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String?      // link to user table 
-  createdAt DateTime   @default(now())
-  messages  Message[]
-  crisisFlag  Boolean @default(false)
+  id          String   @id @default(uuid())
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String?  // link to user table
+  createdAt   DateTime @default(now())
+  messages    Message[]
+  crisisFlag  Boolean  @default(false) @map("crisis_flag")
+  summary     String?  // AI-generated post-session summary
+  mood        String?  // mood at start (onboarding Q3)
+  topic       String?  // main topic (onboarding Q1)
+  durationSec Int?     // session length in seconds
 }
 
 model Message {

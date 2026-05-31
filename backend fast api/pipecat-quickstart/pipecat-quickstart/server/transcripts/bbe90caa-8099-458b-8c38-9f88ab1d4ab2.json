@@ -1,0 +1,45 @@
+{
+  "session_id": "bbe90caa-8099-458b-8c38-9f88ab1d4ab2",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T00:08:05.898182+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Welcome to our conversation, I'm so glad you're here. How are you feeling right now, and what's been on your mind lately?\"",
+      "timestamp": "2026-05-31T00:08:19.134997+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I'm feeling a bit tired today.",
+      "timestamp": "2026-05-31T00:08:19.190089+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Yeah, it sounds like you're feeling a bit drained, that can be tough.\"",
+      "timestamp": "2026-05-31T00:08:26.913075+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hello?",
+      "timestamp": "2026-05-31T00:08:27.654942+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Is.",
+      "timestamp": "2026-05-31T00:08:27.783582+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "You seem a bit distant, is everything okay?",
+      "timestamp": "2026-05-31T00:08:33.361521+00:00"
+    },
+    {
+      "role": "user",
+      "content": "It's a pipe cap cloud, which has crisp.",
+      "timestamp": "2026-05-31T00:08:33.416599+00:00"
+    }
+  ]
+}

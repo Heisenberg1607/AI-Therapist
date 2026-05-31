@@ -1,0 +1,20 @@
+{
+  "session_id": "3945fde6-2671-4214-974d-1bbebffdf3ac",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-30T23:46:35.714426+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It seems that the functions I have are not available. Let me try again with a different approach.",
+      "timestamp": "2026-05-30T23:46:44.917599+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It seems that the functions I have are not available. Let me try again with a different approach. Since the functions are not available, I will provide a simple response that meets the requirements. \"Hello, I'm here to listen and support you. What's been on your mind lately?\"",
+      "timestamp": "2026-05-30T23:47:38.428512+00:00"
+    }
+  ]
+}

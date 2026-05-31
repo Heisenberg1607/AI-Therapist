@@ -29,6 +29,13 @@ export default function Navbar() {
               </span>
               <Button
                 asChild
+                variant="outline"
+                className="rounded-full px-4 sm:px-5 border-white/30 text-white hover:bg-white/10"
+              >
+                <Link href="/dashboard/summary">Dashboard</Link>
+              </Button>
+              <Button
+                asChild
                 className="bg-green-600 hover:bg-green-700 text-white rounded-full px-4 sm:px-5"
               >
                 <Link href="/chat">Start Chat</Link>

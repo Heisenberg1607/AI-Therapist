@@ -4,6 +4,12 @@ import express,{Router} from "express";
 // import { getWelcomeMessage } from "../Controller/Controller";
 import { startSession } from "../Controller/Controller";
 import { login , register } from "../Controller/Controller";
+import {
+  getMe,
+  completeOnboarding,
+  saveSessionSummary,
+  getSessions,
+} from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
 
 const router: Router = express.Router();
@@ -22,6 +28,42 @@ router.post("/startSession", authenticate, async (req, res, next) => {
   try {
     console.log("🎯 Starting new session");
     await startSession(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Current user profile (incl. onboarding state)
+router.get("/me", authenticate, async (req, res, next) => {
+  try {
+    await getMe(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Persist onboarding answers + flag
+router.post("/onboarding", authenticate, async (req, res, next) => {
+  try {
+    await completeOnboarding(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// List the user's past sessions (for the dashboard)
+router.get("/sessions", authenticate, async (req, res, next) => {
+  try {
+    await getSessions(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Save a session's summary + metadata
+router.post("/sessions/:sessionId/summary", authenticate, async (req, res, next) => {
+  try {
+    await saveSessionSummary(req, res);
   } catch (error) {
     next(error);
   }

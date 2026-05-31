@@ -10,13 +10,17 @@ import {
   login as loginApi,
   register as registerApi,
   logout as logoutApi,
+  getMe,
 } from "../lib/api";
+import type { OnboardingAnswers } from "@/lib/buildSystemPrompt";
 import { getToken, setToken, removeToken } from "../lib/auth";
 
 interface User {
   id: string;
   email: string;
   name?: string;
+  onboarded?: boolean;
+  onboardingData?: OnboardingAnswers | null;
 }
 
 interface AuthContextType {
@@ -27,6 +31,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  updateUser: (partial: Partial<User>) => void;
   error: string | null;
   clearError: () => void;
 }
@@ -43,20 +48,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state from localStorage on mount
+  // Initialize auth state from localStorage on mount; restore the user via /me
+  // so auth (and the onboarding flag) survive a page reload.
   useEffect(() => {
-    const initializeAuth = () => {
+    const initializeAuth = async () => {
       const storedToken = getToken();
       if (storedToken) {
         setTokenState(storedToken);
-        // Optionally: validate token and fetch user info
-        // For now, we'll just mark as authenticated
-        // You can add a /api/me endpoint to fetch user details
+        const me = await getMe();
+        if (me) {
+          setUser(me);
+        } else {
+          // Token invalid/expired — getMe already cleared it.
+          setTokenState(null);
+        }
       }
       setIsLoading(false);
     };
 
-    initializeAuth();
+    void initializeAuth();
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -105,6 +115,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
   };
 
+  const updateUser = (partial: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
+  };
+
   const clearError = () => {
     setError(null);
   };
@@ -121,6 +135,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         login,
         register,
         logout,
+        updateUser,
         error,
         clearError,
       }}

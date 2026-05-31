@@ -16,6 +16,7 @@ import { AIgenerateResponse } from "./Service/Service";
 import { createMessage } from "./Model/messageModel";
 import { Sender } from "@prisma/client";
 import { getMessagesBySession } from "./Model/messageModel";
+import { sendTranscriptToCekura } from "./Service/CekuraService";
 import { logger } from "./utils/logger";
 import { turnStore, newTurnId } from "./utils/turnContext";
 
@@ -96,6 +97,7 @@ io.on("connection", (socket) => {
   socket.data.cumulativeTokens = 0;
   socket.data.turnLatencies = [] as number[];
   socket.data.socketConnectedAt = Date.now();
+  socket.data.sessionStartedAt = new Date();
   socket.data.sessionId = null as string | null;
 
   logger.info(
@@ -260,7 +262,7 @@ io.on("connection", (socket) => {
     );
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     const sessionId: string = socket.data.sessionId ?? "unknown";
     const totalTurns: number = socket.data.turnNumber;
     const durationMs = Date.now() - socket.data.socketConnectedAt;
@@ -278,6 +280,13 @@ io.on("connection", (socket) => {
       },
       "Session ended",
     );
+
+    // Send transcript to Cekura for evaluation (within 5-minute window)
+    if (sessionId !== "unknown") {
+      const sessionStartedAt: Date = socket.data.sessionStartedAt ?? new Date();
+      const sessionEndedAt = new Date();
+      await sendTranscriptToCekura(sessionId, sessionStartedAt, sessionEndedAt);
+    }
   });
 });
 

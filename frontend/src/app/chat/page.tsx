@@ -1,95 +1,79 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Mic, MicOff, PhoneOff, Sparkles, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { PhoneOff, Sparkles, Settings2 } from "lucide-react";
 import { VoiceOrb } from "@/app/Components/VoiceOrb";
 import { SessionTimer } from "@/app/Components/SessionTimer";
-import { useMicLevel } from "@/app/hooks/useMicLevel";
-import { useUserCallWindow } from "@/app/hooks/useUserCallWindow";
-import { useCallContext } from "@/app/context/callContext";
 import { CallContextProvider } from "@/app/context/callContext";
 import { ProtectedRoute } from "../Components/ProtectedRoute";
 import { startSession } from "../lib/api";
 import { useAuth } from "../context/authContext";
 import CrisisModal from "@/app/UI/UserCallWindow/CrisisModal";
+import { PipecatVoice, type PipecatVoiceHandle } from "@/components/PipecatVoice";
+import { Onboarding } from "@/components/Onboarding";
+import { buildSystemPrompt, type OnboardingAnswers } from "@/lib/buildSystemPrompt";
+import { saveSession, type TranscriptTurn } from "@/lib/sessionStorage";
+import { completeOnboarding, saveSessionSummary } from "../lib/api";
+
+const ONBOARDING_KEY = "ai_therapist_onboarding";
 
 const ChatPage = () => {
   const [sessionStarted, setSessionStarted] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [aiLevel, setAiLevel] = useState(0);
-  const [isWelcomePlaying, setIsWelcomePlaying] = useState(false);
 
-  const { user } = useAuth();
-  const { text, isProcessing, isAudioPlaying } = useCallContext();
-  const { handleOnRecord, isRecording, isConnected, isCrisis, dismissCrisis } =
-    useUserCallWindow({ sessionId });
+  // Onboarding gates the chat UI; its answers build the personalized prompt.
+  const [systemPrompt, setSystemPrompt] = useState<string | null>(null);
 
-  const { level: micLevel } = useMicLevel(isRecording);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  // Voice state — driven by RTVI events from the Pipecat bot via <VoiceCall>.
+  const [connected, setConnected] = useState(false);
+  const [botSpeaking, setBotSpeaking] = useState(false);
+  const [userSpeaking, setUserSpeaking] = useState(false);
+  const [botThinking, setBotThinking] = useState(false);
+  const [botLevel, setBotLevel] = useState(0);
+  const [userLevel, setUserLevel] = useState(0);
+  const [isCrisis, setIsCrisis] = useState(false);
 
-  // Welcome audio on session start — track playback for orb animation
+  const { user, updateUser } = useAuth();
+  const router = useRouter();
+  const voiceCallRef = useRef<PipecatVoiceHandle | null>(null);
+
+  // Session capture (not displayed) — fed to the post-session dashboard.
+  const startedAtRef = useRef<number | null>(null);
+  const transcriptRef = useRef<TranscriptTurn[]>([]);
+  const answersRef = useRef<OnboardingAnswers>({});
+
+  const dismissCrisis = useCallback(() => setIsCrisis(false), []);
+
+  // Already-onboarded users skip onboarding — rebuild the prompt from their
+  // stored answers so the gate below passes without asking again.
   useEffect(() => {
-    if (sessionStarted) {
-      if (!audioRef.current) {
-        const audio = new Audio("/welcomeMessage.mp3");
-        audio.onplay = () => setIsWelcomePlaying(true);
-        audio.onended = () => setIsWelcomePlaying(false);
-        audio.onpause = () => setIsWelcomePlaying(false);
-        audioRef.current = audio;
-        audio.play().catch(console.error);
-      }
-    } else {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.currentTime = 0;
-        audioRef.current = null;
-      }
-      setIsWelcomePlaying(false);
+    if (user?.onboarded && user.onboardingData && !systemPrompt) {
+      answersRef.current = user.onboardingData;
+      setSystemPrompt(buildSystemPrompt(user.onboardingData));
     }
-  }, [sessionStarted]);
+  }, [user, systemPrompt]);
 
-  // Animate orb whenever AI audio is active (processing, playing back, or welcome)
-  const aiActive = isProcessing || isAudioPlaying || isWelcomePlaying;
-  useEffect(() => {
-    if (!aiActive) {
-      setAiLevel(0);
-      return;
-    }
-    let raf = 0;
-    let phase = 0;
-    const start = performance.now();
-
-    const animate = (now: number) => {
-      const t = ((now - start) % 4000) / 4000;
-      phase += 0.18;
-      const env = Math.sin(t * Math.PI);
-      const wobble =
-        (Math.sin(phase) * 0.4 + Math.sin(phase * 2.3) * 0.3 + 0.6) * 0.5;
-      setAiLevel(Math.max(0, Math.min(1, env * (0.4 + wobble))));
-      raf = requestAnimationFrame(animate);
-    };
-    raf = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(raf);
-  }, [aiActive]);
-
-  // Orb level: AI animation when any AI audio active, mic when user is speaking
+  // Orb level: bot's voice while it speaks, user's mic while they speak.
   const orbLevel = useMemo(() => {
-    if (aiActive) return aiLevel;
-    if (isRecording) return micLevel;
+    if (botSpeaking) return botLevel;
+    if (userSpeaking) return userLevel;
     return 0;
-  }, [aiActive, aiLevel, isRecording, micLevel]);
+  }, [botSpeaking, botLevel, userSpeaking, userLevel]);
+
+  const aiActive = botSpeaking || botThinking;
 
   const status = !sessionStarted
     ? "Ready when you are"
-    : isWelcomePlaying
-    ? "Starting your session"
-    : isProcessing || isAudioPlaying
+    : botThinking
+    ? "AI Therapist is reflecting"
+    : botSpeaking
     ? "AI Therapist is speaking"
-    : isRecording
+    : userSpeaking
     ? "Listening to you"
-    : isConnected
-    ? "Connected · tap mic to speak"
-    : "Session active";
+    : connected
+    ? "Connected · just start talking"
+    : "Connecting…";
 
   const handleStartSession = async () => {
     try {
@@ -97,32 +81,141 @@ const ChatPage = () => {
       const data = await startSession();
       setSessionId(data.sessionId);
       setSessionStarted(true);
+      startedAtRef.current = Date.now();
+      transcriptRef.current = [];
+      await voiceCallRef.current?.connect();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start session";
       setError(msg);
+      setSessionStarted(false);
+      setSessionId(null);
     }
   };
 
-  const handleEndSession = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
+  const summarizeTranscript = async (
+    transcript: TranscriptTurn[],
+  ): Promise<string> => {
+    try {
+      const res = await fetch("/api/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript }),
+      });
+      if (!res.ok) return "";
+      const data = await res.json();
+      return typeof data.summary === "string" ? data.summary : "";
+    } catch {
+      return "";
     }
+  };
+
+  const handleEndSession = async () => {
+    void voiceCallRef.current?.disconnect();
+
+    const currentSessionId = sessionId;
+    const startedAt = startedAtRef.current;
+    const duration = startedAt ? Math.round((Date.now() - startedAt) / 1000) : 0;
+    const transcript = transcriptRef.current;
+    const answers = answersRef.current;
+
     setSessionStarted(false);
     setSessionId(null);
+    setConnected(false);
+    setBotSpeaking(false);
+    setUserSpeaking(false);
+    setBotThinking(false);
+
+    const summary = await summarizeTranscript(transcript);
+    const mood = answers.mood ?? "";
+    const topic = answers.reason ?? "";
+
+    // Persist to the DB so the same user can fetch it on future visits.
+    if (currentSessionId) {
+      await saveSessionSummary(currentSessionId, {
+        summary,
+        mood,
+        topic,
+        durationSec: duration,
+      }).catch(() => {});
+    }
+
+    // Local copy (offline fallback for the dashboard).
+    saveSession({
+      id: currentSessionId ?? String(Date.now()),
+      date: new Date().toISOString(),
+      duration,
+      mood,
+      topic,
+      summary,
+      transcript,
+    });
+
+    router.push("/dashboard/summary");
   };
 
-  // Display text: show AI response or live transcript
+  const handleOnboardingComplete = (answers: OnboardingAnswers) => {
+    answersRef.current = answers;
+    // Persisted so the post-session dashboard can read mood/topic.
+    try {
+      localStorage.setItem(ONBOARDING_KEY, JSON.stringify(answers));
+    } catch {
+      // ignore storage failures
+    }
+    setSystemPrompt(buildSystemPrompt(answers));
+    // Persist the onboarded flag + answers to the DB so we never ask again.
+    updateUser({ onboarded: true, onboardingData: answers });
+    void completeOnboarding(answers);
+  };
+
+  // Show onboarding only for users who haven't onboarded yet. Already-onboarded
+  // users have their prompt rebuilt by the effect above, so they skip it.
+  if (!user?.onboarded && !systemPrompt) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
+  // Display text: a calm prompt only — live captions are disabled.
+  const firstName = user?.name?.split(" ")[0] ?? "there";
   const displayText = sessionStarted
-    ? text
-      ? `"${text}"`
-      : isProcessing
-      ? "Processing your response…"
-      : "I'm listening… take your time."
+    ? connected
+      ? `Welcome ${firstName}, I am here to listen. How are you feeling right now?`
+      : "Connecting you to your session…"
     : '"A safe, quiet space — whenever you need to talk."';
 
   return (
     <>
+      <PipecatVoice
+        ref={voiceCallRef}
+        sessionId={sessionId}
+        userId={user?.id ?? null}
+        systemPrompt={systemPrompt}
+        onConnectedChange={setConnected}
+        onBotSpeaking={setBotSpeaking}
+        onUserSpeaking={setUserSpeaking}
+        onBotThinking={setBotThinking}
+        onBotAudioLevel={setBotLevel}
+        onUserAudioLevel={setUserLevel}
+        onUserTranscript={(text, final) => {
+          // Captured for the post-session summary; not displayed (captions off).
+          if (final && text.trim()) {
+            transcriptRef.current.push({
+              role: "user",
+              content: text,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }}
+        onBotTranscript={(text) => {
+          if (text.trim()) {
+            transcriptRef.current.push({
+              role: "assistant",
+              content: text,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }}
+        onCrisis={() => setIsCrisis(true)}
+      />
+
       {isCrisis && <CrisisModal onDismiss={dismissCrisis} />}
 
       <div
@@ -250,30 +343,6 @@ const ChatPage = () => {
                 animation: "scale-in 0.3s ease-out",
               }}
             >
-              {/* Mic toggle */}
-              <button
-                onClick={handleOnRecord}
-                disabled={isProcessing}
-                className="group flex flex-col items-center gap-2 disabled:opacity-50"
-              >
-                <div
-                  className={`w-12 h-12 rounded-full border flex items-center justify-center transition-all ${
-                    isRecording
-                      ? "bg-red-500/20 border-red-500/50 text-red-400"
-                      : "border-white/20 hover:border-starlight/40 hover:bg-starlight/5 text-white/70"
-                  }`}
-                >
-                  {isRecording ? (
-                    <MicOff className="w-5 h-5" />
-                  ) : (
-                    <Mic className="w-5 h-5" />
-                  )}
-                </div>
-                <span className="text-[9px] uppercase tracking-[0.2em] text-white/40 group-hover:text-starlight transition-colors">
-                  {isRecording ? "Stop" : "Speak"}
-                </span>
-              </button>
-
               {/* End session */}
               <button
                 onClick={handleEndSession}
@@ -308,10 +377,12 @@ const ChatPage = () => {
             {[
               {
                 k: "State",
-                v: isProcessing
+                v: botThinking
                   ? "Reflecting"
-                  : isRecording
+                  : userSpeaking
                   ? "Listening"
+                  : aiActive
+                  ? "Speaking"
                   : "Idle",
               },
               { k: "Tone", v: "Calm" },
@@ -328,7 +399,7 @@ const ChatPage = () => {
         )}
 
         {/* Connection status dot — bottom-left when connected */}
-        {sessionStarted && isConnected && (
+        {sessionStarted && connected && (
           <div className="fixed bottom-12 left-8 z-10 flex items-center gap-2 opacity-50">
             <div className="w-1.5 h-1.5 rounded-full bg-starlight animate-pulse" />
             <span className="text-[9px] uppercase tracking-[0.25em] text-white/40">
