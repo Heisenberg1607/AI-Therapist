@@ -2,7 +2,6 @@
 
 > A real-time, voice-first AI therapist powered by Pipecat, NVIDIA NIM, Deepgram, and ElevenLabs — with Cekura evaluating every session automatically.
 
-Loo
 
 ---
 
