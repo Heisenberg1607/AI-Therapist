@@ -17,9 +17,13 @@ import {
   verifyPassword,
   getUserProfile,
   setUserOnboarding,
+  upsertGoogleUser,
 } from "../Model/userModel";
 import { generateToken } from "../utils/jwtUtils";
 import { logger } from "../utils/logger";
+import { OAuth2Client } from "google-auth-library";
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 
 export const login = async (req: Request, res: Response) => {
@@ -32,6 +36,11 @@ export const login = async (req: Request, res: Response) => {
     const user = await findUserByEmail(email);
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password." });
+    }
+
+    // OAuth-only accounts (e.g. Google) have no password set.
+    if (!user.password) {
+      return res.status(401).json({ message: "This account uses Google sign-in." });
     }
 
     const isPasswordValid = await verifyPassword(password, user.password);
@@ -58,6 +67,53 @@ export const login = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Server error", error });
   }
 }
+
+export const googleAuth = async (req: Request, res: Response) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Missing Google credential." });
+    }
+    if (!process.env.GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ message: "Google auth is not configured." });
+    }
+
+    // Verify the Google ID token (signature + audience).
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.email || !payload.sub) {
+      return res.status(401).json({ message: "Invalid Google token." });
+    }
+
+    const user = await upsertGoogleUser({
+      googleId: payload.sub,
+      email: payload.email,
+      name: payload.name,
+      image: payload.picture,
+    });
+
+    const token = await generateToken(user.id);
+
+    res.status(200).json({
+      message: "Google login successful",
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        image: user.image,
+        onboarded: user.onboarded,
+        onboardingData: user.onboardingData,
+      },
+      token,
+    });
+  } catch (error) {
+    console.error("Google auth error", error);
+    res.status(401).json({ message: "Google authentication failed." });
+  }
+};
 
 export const register = async (req: Request, res: Response) => {
   try {

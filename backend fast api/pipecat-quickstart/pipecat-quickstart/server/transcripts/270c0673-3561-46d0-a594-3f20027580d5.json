@@ -1,0 +1,25 @@
+{
+  "session_id": "270c0673-3561-46d0-a594-3f20027580d5",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T01:35:16.307257+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Welcome to our conversation today, I'm so glad you're here to talk. How are you feeling right now, and what brings you to share this time with me?\"",
+      "timestamp": "2026-05-31T01:35:45.111906+00:00"
+    },
+    {
+      "role": "user",
+      "content": "No. I think it's",
+      "timestamp": "2026-05-31T01:35:45.169988+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"that's okay, no need to rush, just take your time.\"",
+      "timestamp": "2026-05-31T01:35:58.681773+00:00"
+    }
+  ]
+}

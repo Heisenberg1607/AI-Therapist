@@ -5,6 +5,7 @@ import Navbar from "./UI/Navbar/navbar";
 import Footer from "@/app/UI/Footer/footer";
 import { AuthProvider } from "./context/authContext";
 import { CallContextProvider } from "./context/callContext";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,13 +32,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AuthProvider>
-          <CallContextProvider>
-            <Navbar />
-            {children}
-            <Footer />
-          </CallContextProvider>
-        </AuthProvider>
+        <GoogleOAuthProvider
+          clientId={process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""}
+        >
+          <AuthProvider>
+            <CallContextProvider>
+              <Navbar />
+              {children}
+              <Footer />
+            </CallContextProvider>
+          </AuthProvider>
+        </GoogleOAuthProvider>
       </body>
     </html>
   );

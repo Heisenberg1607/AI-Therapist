@@ -1,0 +1,70 @@
+{
+  "session_id": "1770463b-9428-41b5-a585-c89e0c9816ca",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-06-01T21:41:28.706945+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "yeah, I'm so",
+      "timestamp": "2026-06-01T21:41:30.380369+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hey.",
+      "timestamp": "2026-06-01T21:41:30.452232+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It's great to meet you, and I'm here to listen if you'd like to share what's been on your mind lately.",
+      "timestamp": "2026-06-01T21:41:40.985977+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Yeah. I'm feeling super stressed right now. I don't know why.",
+      "timestamp": "2026-06-01T21:41:41.064207+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "That sounds really overwhelming. Can you tell me a bit more about what's been going on that's making you feel stressed?",
+      "timestamp": "2026-06-01T21:41:53.338777+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I think it's because of the financial issues that are happening right now.",
+      "timestamp": "2026-06-01T21:41:53.415371+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Yeah, that pressure makes sense. How long have you been dealing with these financial issues?",
+      "timestamp": "2026-06-01T21:42:01.103364+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I think a couple of weeks now.",
+      "timestamp": "2026-06-01T21:42:01.181519+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "It's been going on for just a short while, but still, it can feel really heavy. What kind of support do you feel like you need right now?",
+      "timestamp": "2026-06-01T21:42:11.304098+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I don't know.",
+      "timestamp": "2026-06-01T21:42:16.189616+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Just listen to me, I guess.",
+      "timestamp": "2026-06-01T21:42:16.269704+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "I'm here to listen. Go ahead and share as much or as little as you feel comfortable with.",
+      "timestamp": "2026-06-01T21:42:23.520552+00:00"
+    }
+  ]
+}

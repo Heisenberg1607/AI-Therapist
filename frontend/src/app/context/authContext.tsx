@@ -10,6 +10,7 @@ import {
   login as loginApi,
   register as registerApi,
   logout as logoutApi,
+  googleAuth as googleAuthApi,
   getMe,
 } from "../lib/api";
 import type { OnboardingAnswers } from "@/lib/buildSystemPrompt";
@@ -19,6 +20,7 @@ interface User {
   id: string;
   email: string;
   name?: string;
+  image?: string | null;
   onboarded?: boolean;
   onboardingData?: OnboardingAnswers | null;
 }
@@ -30,6 +32,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
+  googleLogin: (credential: string) => Promise<void>;
   logout: () => void;
   updateUser: (partial: Partial<User>) => void;
   error: string | null;
@@ -108,6 +111,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const googleLogin = async (credential: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const response = await googleAuthApi(credential);
+
+      setToken(response.token);
+      setTokenState(response.token);
+      setUser(response.user);
+    } catch (err: unknown) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Google sign-in failed";
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     logoutApi();
     removeToken();
@@ -134,6 +157,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         isAuthenticated,
         login,
         register,
+        googleLogin,
         logout,
         updateUser,
         error,

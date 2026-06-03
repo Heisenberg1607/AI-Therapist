@@ -24,6 +24,59 @@ export const findUserByEmail = async (email: string) => {
   });
 };
 
+type GoogleProfile = {
+  googleId: string;
+  email: string;
+  name?: string | null;
+  image?: string | null;
+};
+
+// Find-or-create a user from a verified Google profile.
+// Links Google to an existing local account when the email already exists.
+export const upsertGoogleUser = async (profile: GoogleProfile) => {
+  const select = {
+    id: true,
+    email: true,
+    name: true,
+    image: true,
+    onboarded: true,
+    onboardingData: true,
+  } as const;
+
+  // 1) Already linked via googleId.
+  const existing = await prisma.user.findUnique({
+    where: { googleId: profile.googleId },
+    select,
+  });
+  if (existing) return existing;
+
+  // 2) Existing local account with the same email → link Google to it.
+  const byEmail = await prisma.user.findUnique({ where: { email: profile.email } });
+  if (byEmail) {
+    return await prisma.user.update({
+      where: { id: byEmail.id },
+      data: {
+        googleId: profile.googleId,
+        image: byEmail.image ?? profile.image ?? null,
+        provider: byEmail.provider ?? "google",
+      },
+      select,
+    });
+  }
+
+  // 3) Brand-new Google user (no password).
+  return await prisma.user.create({
+    data: {
+      email: profile.email,
+      name: profile.name ?? null,
+      googleId: profile.googleId,
+      image: profile.image ?? null,
+      provider: "google",
+    },
+    select,
+  });
+};
+
 // Public-safe user fields (no password), including onboarding state.
 export const getUserProfile = async (userId: string) => {
   return await prisma.user.findUnique({

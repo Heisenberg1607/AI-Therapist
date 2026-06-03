@@ -2,7 +2,7 @@
 # Copyright (c) 2024–2025, Daily
 #
 # SPDX-License-Identifier: BSD 2-Clause License
-#
+# 
 
 """AI Therapist Bot - Pipecat Voice Agent
 
@@ -202,14 +202,12 @@ async def run_bot(
         ),
     )
 
-    # LLM service - NVIDIA NIM via OpenAI-compatible API
-    # stop=["<think>"] cuts off Llama chain-of-thought leaks at the API level
+    # LLM service - OpenAI API
     llm = OpenAILLMService(
-        api_key=os.getenv("NVIDIA_API_KEY"),
-        base_url="https://integrate.api.nvidia.com/v1",
+        api_key=os.getenv("OPENAI_API_KEY"),
+        base_url="https://api.openai.com/v1",
         settings=OpenAILLMService.Settings(
-            model="meta/llama-3.1-8b-instruct",
-            extra={"stop": ["<think>", "\n<think>"]},
+            model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
         ),
     )
 

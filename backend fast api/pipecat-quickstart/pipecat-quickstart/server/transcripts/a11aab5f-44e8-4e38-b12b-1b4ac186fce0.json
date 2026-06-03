@@ -1,0 +1,125 @@
+{
+  "session_id": "a11aab5f-44e8-4e38-b12b-1b4ac186fce0",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T01:43:49.540532+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Hello, I'm so glad you're here. How are you doing today,",
+      "timestamp": "2026-05-31T01:43:54.198013+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hey, Melo. Can you hear me?",
+      "timestamp": "2026-05-31T01:43:54.261414+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Yeah, I can hear you just fine. You sound a little quiet, though - is everything okay?\"",
+      "timestamp": "2026-05-31T01:44:03.130595+00:00"
+    },
+    {
+      "role": "user",
+      "content": "It says that muted. So it's not listening.",
+      "timestamp": "2026-05-31T01:44:03.187615+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Okay, no worries",
+      "timestamp": "2026-05-31T01:44:05.711967+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I mean, the audio is not on.",
+      "timestamp": "2026-05-31T01:44:05.891521+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Got it, the audio is off then.\"",
+      "timestamp": "2026-05-31T01:44:12.337942+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I just wanna share this specific if that's possible.",
+      "timestamp": "2026-05-31T01:44:13.230927+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Yeah. Yeah.",
+      "timestamp": "2026-05-31T01:44:13.296981+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Of \"Okay, course, I'm I'm here here to listen. to listen. What's been on your mind lately?\"",
+      "timestamp": "2026-05-31T01:44:28.068106+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Should have the Bluetooth. Oops.",
+      "timestamp": "2026-05-31T01:44:28.250772+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"No worries about the Bluetooth, take your time. You were saying what's been on your mind?\"",
+      "timestamp": "2026-05-31T01:44:37.181875+00:00"
+    },
+    {
+      "role": "user",
+      "content": "You won't stay in my group.",
+      "timestamp": "2026-05-31T01:44:37.239658+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"I'm here with you now, so you're not alone.\"",
+      "timestamp": "2026-05-31T01:44:40.621541+00:00"
+    },
+    {
+      "role": "user",
+      "content": "You want sugar?",
+      "timestamp": "2026-05-31T01:44:40.678065+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"No, I'm",
+      "timestamp": "2026-05-31T01:44:42.239411+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Quite weird.",
+      "timestamp": "2026-05-31T01:44:42.300011+00:00"
+    },
+    {
+      "role": "user",
+      "content": "What we can do is just play it",
+      "timestamp": "2026-05-31T01:44:47.934385+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"I'm not sure what's going",
+      "timestamp": "2026-05-31T01:44:50.001580+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Your MacBook.",
+      "timestamp": "2026-05-31T01:44:58.343825+00:00"
+    },
+    {
+      "role": "user",
+      "content": "And then turn up your mic. Yeah. That that can see Hey, Mello. Can you hear me?",
+      "timestamp": "2026-05-31T01:44:58.403690+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Ah, yeah, I can hear you now! Sorry about the technical issues earlier.\"",
+      "timestamp": "2026-05-31T01:45:06.447035+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hello?",
+      "timestamp": "2026-05-31T01:45:06.605934+00:00"
+    }
+  ]
+}

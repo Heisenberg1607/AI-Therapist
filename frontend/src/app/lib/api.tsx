@@ -7,6 +7,7 @@ export interface AuthUser {
   id: string;
   email: string;
   name?: string;
+  image?: string | null;
   onboarded?: boolean;
   onboardingData?: OnboardingAnswers | null;
 }
@@ -60,6 +61,23 @@ export const login = async (
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.message || "Login failed");
+  }
+
+  return response.json();
+};
+
+export const googleAuth = async (
+  credential: string,
+): Promise<LoginResponse> => {
+  const response = await fetch(`${API_BASE_URL}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ credential }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "Google sign-in failed");
   }
 
   return response.json();

@@ -1,0 +1,175 @@
+{
+  "session_id": "5224736a-52a2-45c8-a517-0f661497e5d3",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T01:43:48.496052+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "yeah, I'm glad you're here, and I'm happy to listen and support you",
+      "timestamp": "2026-05-31T01:43:54.199753+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hey, Melo. Can you hear me?",
+      "timestamp": "2026-05-31T01:43:54.949922+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "I can hear you just fine, Melo. How are you feeling right now?",
+      "timestamp": "2026-05-31T01:44:02.887581+00:00"
+    },
+    {
+      "role": "user",
+      "content": "It says that muted. So it's not listening.",
+      "timestamp": "2026-05-31T01:44:02.946449+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Let's try to get that",
+      "timestamp": "2026-05-31T01:44:05.709846+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I mean, the audio is not off.",
+      "timestamp": "2026-05-31T01:44:05.770289+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "So the audio is on, but it's not picking up what I'm saying.",
+      "timestamp": "2026-05-31T01:44:12.370919+00:00"
+    },
+    {
+      "role": "user",
+      "content": "I just wanna share this specific if that's possible.",
+      "timestamp": "2026-05-31T01:44:13.130880+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "You're",
+      "timestamp": "2026-05-31T01:44:13.190224+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Yeah. Yeah.",
+      "timestamp": "2026-05-31T01:44:13.249288+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "I get that. You're not really feeling like talking about it right now, but you're willing to share if you can",
+      "timestamp": "2026-05-31T01:44:28.092198+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Should have the Bluetooth. Oops. Sorry.",
+      "timestamp": "2026-05-31T01:44:28.242962+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "No need to apologize, Melo. Let's just take a deep breath and try to focus on what you're comfortable sharing.",
+      "timestamp": "2026-05-31T01:44:37.196141+00:00"
+    },
+    {
+      "role": "user",
+      "content": "You won't stay in my group.",
+      "timestamp": "2026-05-31T01:44:37.250346+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "That sounds frustrating. What's going on with that?",
+      "timestamp": "2026-05-31T01:44:47.723507+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Not sure. We can do is just play it from",
+      "timestamp": "2026-05-31T01:44:47.806251+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "You're not sure what's",
+      "timestamp": "2026-05-31T01:44:50.011963+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Your MacBook?",
+      "timestamp": "2026-05-31T01:44:58.343533+00:00"
+    },
+    {
+      "role": "user",
+      "content": "And then turn up your mic. Yeah. That that Can see. Hey, Malu. Can you hear me?",
+      "timestamp": "2026-05-31T01:44:58.411968+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Yeah, I can hear you now, Malu. What's been going on that's been feeling overwhelming for",
+      "timestamp": "2026-05-31T01:45:06.552338+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hello?",
+      "timestamp": "2026-05-31T01:45:06.614129+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "I think we lost the connection again, Malu. Can you try to reconnect?",
+      "timestamp": "2026-05-31T01:45:27.032640+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hey. I'm on this thing right now. I'm feeling super anxious.",
+      "timestamp": "2026-05-31T01:45:27.108087+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Yeah, that sounds really tough. Can you tell me a bit more about what's going on that's making you feel anxious?",
+      "timestamp": "2026-05-31T01:45:36.511628+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Maybe a couple of weeks.",
+      "timestamp": "2026-05-31T01:45:36.579108+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "So this anxiety has been going on for a couple of weeks now. That can be really overwhelming. How has it been affecting you, feeling like this?",
+      "timestamp": "2026-05-31T01:45:46.446905+00:00"
+    },
+    {
+      "role": "user",
+      "content": "The most overwhelming part",
+      "timestamp": "2026-05-31T01:45:48.646893+00:00"
+    },
+    {
+      "role": "user",
+      "content": "about that, honestly.",
+      "timestamp": "2026-05-31T01:45:48.724038+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "That feels really heavy.",
+      "timestamp": "2026-05-31T01:46:03.790361+00:00"
+    },
+    {
+      "role": "user",
+      "content": "There's some financial stress and loss of relationship stress.",
+      "timestamp": "2026-05-31T01:46:03.866392+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Those can",
+      "timestamp": "2026-05-31T01:46:11.004969+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Hello. You there?",
+      "timestamp": "2026-05-31T01:46:11.157786+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "Yeah, I'm here, Malu. Sorry about that. You were saying something about financial stress and loss of a relationship?",
+      "timestamp": "2026-05-31T01:47:47.443099+00:00"
+    }
+  ]
+}

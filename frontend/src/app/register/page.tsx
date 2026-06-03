@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { GoogleLogin } from "@react-oauth/google";
 
 export default function RegisterPage() {
   const [name, setName] = useState("");
@@ -14,8 +15,23 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
-  const { register, error, isLoading, clearError } = useAuth();
+  const { register, googleLogin, error, isLoading, clearError } = useAuth();
   const router = useRouter();
+
+  const handleGoogleSuccess = async (credential?: string) => {
+    setLocalError(null);
+    clearError();
+    if (!credential) {
+      setLocalError("Google sign-in failed");
+      return;
+    }
+    try {
+      await googleLogin(credential);
+      router.push("/chat");
+    } catch (err) {
+      console.error("Google sign-in failed:", err);
+    }
+  };
 
   // Generate dot positions once and memoize them
   const dots = useMemo(() => {
@@ -218,6 +234,24 @@ export default function RegisterPage() {
               )}
             </Button>
           </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="h-px flex-1 bg-white/15" />
+            <span className="text-xs uppercase tracking-wider text-gray-400">or</span>
+            <div className="h-px flex-1 bg-white/15" />
+          </div>
+
+          {/* Google sign-up */}
+          <div className="flex justify-center">
+            <GoogleLogin
+              onSuccess={(cred) => handleGoogleSuccess(cred.credential)}
+              onError={() => setLocalError("Google sign-in failed")}
+              theme="filled_black"
+              text="signup_with"
+              shape="pill"
+            />
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-4">
           <div className="text-sm text-center text-gray-300">

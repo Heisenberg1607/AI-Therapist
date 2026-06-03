@@ -10,11 +10,22 @@ import {
 } from "react";
 import { PipecatClient } from "@pipecat-ai/client-js";
 import { PipecatClientAudio, PipecatClientProvider } from "@pipecat-ai/client-react";
-import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
+import { DailyTransport } from "@pipecat-ai/daily-transport";
 
-// The Pipecat bot's HTTP server.
-const BASE_URL = "http://localhost:7860";
+// The Pipecat Cloud agent's public start endpoint.
+const BASE_URL =
+  process.env.NEXT_PUBLIC_PIPECAT_BOT_URL ?? "http://localhost:7860";
 const CONNECT_ENDPOINT = "/start";
+const BOT_KEY =
+  process.env.NEXT_PUBLIC_PIPECAT_BOT_KEY ??
+  process.env.NEXT_PUBLIC_PIPECAT_PUBLIC_KEY;
+
+function resolveStartEndpoint(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/start")
+    ? trimmed
+    : `${trimmed}${CONNECT_ENDPOINT}`;
+}
 
 export type PipecatVoiceHandle = {
   connect: () => Promise<void>;
@@ -52,10 +63,10 @@ type CallbackBag = PipecatVoiceProps;
 
 /**
  * PipecatVoice — logic-only voice connection using PipecatClient +
- * SmallWebRTCTransport (no external service; connects directly to the local
- * bot). Owns the client, exposes connect()/disconnect() via ref, surfaces RTVI
- * events through callback props, and renders PipecatClientAudio for playback.
- * Renders no visible UI.
+ * DailyTransport. Starts the agent via Pipecat Cloud's public /start endpoint,
+ * then joins the returned Daily room. Owns the client, exposes
+ * connect()/disconnect() via ref, surfaces RTVI events through callback props,
+ * and renders PipecatClientAudio for playback. Renders no visible UI.
  */
 export const PipecatVoice = forwardRef<PipecatVoiceHandle, PipecatVoiceProps>(
   (props, ref) => {
@@ -67,7 +78,7 @@ export const PipecatVoice = forwardRef<PipecatVoiceHandle, PipecatVoiceProps>(
     const client = useMemo(() => {
       const cb = () => bag.current;
       return new PipecatClient({
-        transport: new SmallWebRTCTransport(),
+        transport: new DailyTransport({ bufferLocalAudioUntilBotReady: true }),
         enableMic: true,
         enableCam: false,
         callbacks: {
@@ -99,16 +110,55 @@ export const PipecatVoice = forwardRef<PipecatVoiceHandle, PipecatVoiceProps>(
       ref,
       () => ({
         connect: async () => {
-          await client.connect({
-            endpoint: `${BASE_URL}${CONNECT_ENDPOINT}`,
-            requestData: {
+          if (!BOT_KEY) {
+            throw new Error(
+              "Missing NEXT_PUBLIC_PIPECAT_BOT_KEY (or NEXT_PUBLIC_PIPECAT_PUBLIC_KEY) in frontend env",
+            );
+          }
+
+          // Ask Pipecat Cloud to spin up a Daily room for this agent run. The
+          // public start endpoint requires a Bearer public key and only returns
+          // a room when createDailyRoom is true. Session identity is nested in
+          // `body` so it arrives at the bot as runner_args.body.
+          const res = await fetch(resolveStartEndpoint(BASE_URL), {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${BOT_KEY}`,
+            },
+            body: JSON.stringify({
+              createDailyRoom: true,
               body: {
                 sessionId: bag.current.sessionId ?? null,
                 userId: bag.current.userId ?? null,
                 systemPrompt: bag.current.systemPrompt ?? null,
               },
-            },
+            }),
           });
+
+          if (!res.ok) {
+            const detail = await res.text().catch(() => "");
+            throw new Error(
+              `Failed to start bot (${res.status} ${res.statusText}) ${detail}`,
+            );
+          }
+
+          const payload = (await res.json()) as {
+            dailyRoom?: string;
+            dailyToken?: string;
+            roomUrl?: string;
+            token?: string;
+            url?: string;
+          };
+
+          const dailyRoom = payload.dailyRoom ?? payload.roomUrl ?? payload.url;
+          const dailyToken = payload.dailyToken ?? payload.token;
+
+          if (!dailyRoom) {
+            throw new Error("Start endpoint did not return a Daily room URL");
+          }
+
+          await client.connect({ url: dailyRoom, token: dailyToken });
         },
         disconnect: async () => {
           await client.disconnect();

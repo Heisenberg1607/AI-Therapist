@@ -1,0 +1,65 @@
+{
+  "session_id": "82375e47-c3b8-4abe-9554-e0c9d0ca7b69",
+  "turns": [
+    {
+      "role": "user",
+      "content": "Begin the session now with a short, warm, one or two sentence greeting that welcomes me and gently invites me to share what's on my mind. Keep it light \u2014 do not ask anything heavy yet.",
+      "timestamp": "2026-05-31T01:37:27.622947+00:00"
+    },
+    {
+      "role": "user",
+      "content": "A.",
+      "timestamp": "2026-05-31T01:37:28.409481+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"Hey, \"Hey, I'm there, so glad I'm so you're glad here. you're here. How are you feeling",
+      "timestamp": "2026-05-31T01:37:31.478360+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Now it's",
+      "timestamp": "2026-05-31T01:37:31.546651+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"great to have",
+      "timestamp": "2026-05-31T01:37:33.167885+00:00"
+    },
+    {
+      "role": "user",
+      "content": "now",
+      "timestamp": "2026-05-31T01:37:33.230052+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "\"you're",
+      "timestamp": "2026-05-31T01:37:34.556727+00:00"
+    },
+    {
+      "role": "user",
+      "content": "now it's running.",
+      "timestamp": "2026-05-31T01:37:34.611867+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "What's \"through been your mind, going yeah?\"",
+      "timestamp": "2026-05-31T01:37:38.110089+00:00"
+    },
+    {
+      "role": "user",
+      "content": "You",
+      "timestamp": "2026-05-31T01:37:39.725191+00:00"
+    },
+    {
+      "role": "user",
+      "content": "Mine is. He is",
+      "timestamp": "2026-05-31T01:39:18.976612+00:00"
+    },
+    {
+      "role": "user",
+      "content": "You you shared the entire screen. You need to share that specific",
+      "timestamp": "2026-05-31T01:39:19.163136+00:00"
+    }
+  ]
+}
