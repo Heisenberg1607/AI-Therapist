@@ -44,20 +44,6 @@ function formatDate(iso: string): string {
   }
 }
 
-function formatDateTime(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return iso;
-  }
-}
-
 function formatDuration(seconds: number): string {
   if (!seconds) return "—";
   const m = Math.floor(seconds / 60);
