@@ -10,11 +10,9 @@ datasource db {
 model User{
   id        String @id @default (uuid())
   email     String @unique
-  password  String? // hashed; null for OAuth-only (e.g. Google) users
+  password  String? // hashed password
   name      String?
-  googleId  String? @unique // Google account subject id (OAuth users)
-  image     String? // profile picture URL (from Google)
-  provider  String? @default("local") // "local" | "google"
+  image     String?
   onboarded      Boolean @default(false)
   onboardingData Json?   // stored onboarding answers, used to rebuild the prompt
   createdAt DateTime @default(now())

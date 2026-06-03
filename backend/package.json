@@ -24,7 +24,6 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
-    "google-auth-library": "^10.6.2",
     "jsonwebtoken": "^9.0.3",
     "openai": "^6.29.0",
     "pino": "^10.3.1",

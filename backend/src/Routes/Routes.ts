@@ -3,7 +3,7 @@ import express,{Router} from "express";
 // import { generateResponse } from "../Controller/Controller"
 // import { getWelcomeMessage } from "../Controller/Controller";
 import { startSession } from "../Controller/Controller";
-import { login , register, googleAuth } from "../Controller/Controller";
+import { login , register } from "../Controller/Controller";
 import {
   getMe,
   completeOnboarding,
@@ -17,7 +17,6 @@ const router: Router = express.Router();
 // Public routes
 router.post("/login", login);
 router.post("/register", register);
-router.post("/auth/google", googleAuth);
 
 // Health check route
 router.get("/health", (_req, res) => {
