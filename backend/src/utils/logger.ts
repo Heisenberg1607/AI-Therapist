@@ -32,15 +32,27 @@ const lokiTarget = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyTarget = any;
 
-const transport = lokiUsername && lokiApiKey
-  ? pino.transport({ targets: [prettyTarget, lokiTarget] as AnyTarget[] })
-  : pino.transport(prettyTarget);
+const isProduction = process.env.NODE_ENV === "production";
+const targets: AnyTarget[] = [];
+
+// pino-pretty is a dev dependency, so only use it in non-production.
+if (!isProduction) {
+  targets.push(prettyTarget);
+}
+
+if (lokiUsername && lokiApiKey) {
+  targets.push(lokiTarget);
+}
+
+const transport = targets.length > 0
+  ? pino.transport({ targets })
+  : undefined;
 
 /**
  * Shared structured logger.
  *
- * Always pretty-prints to terminal via pino-pretty.
- * Also ships to Grafana Loki when GRAFANA_LOKI_USERNAME and GRAFANA_LOKI_API_KEY are set.
+ * Pretty-prints to terminal via pino-pretty in non-production only.
+ * Ships to Grafana Loki when GRAFANA_LOKI_USERNAME and GRAFANA_LOKI_API_KEY are set.
  *
  * messageKey is "msg" so the "message" data field (e.g. DB content) can be
  * safely redacted without touching the human-readable log string.
