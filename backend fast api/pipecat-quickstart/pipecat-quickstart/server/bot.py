@@ -33,6 +33,10 @@ from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.frames.frames import Frame, LLMFullResponseEndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
@@ -241,10 +245,24 @@ async def run_bot(
         messages=[],
         tools=ToolsSchema(standard_tools=[crisis_tool]),
     )
+    # Semantic end-of-turn detection. Smart Turn v3 is Pipecat's default stop
+    # strategy as of 1.3.0; we wire it explicitly so the behavior is visible and
+    # locked against future default changes, and so stop_secs is tunable here.
+    smart_turn = LocalSmartTurnAnalyzerV3(
+        params=SmartTurnParams(
+            stop_secs=2.0,        # silence fallback when the model is unsure (default 3.0)
+            pre_speech_ms=500,    # default
+            max_duration_secs=8,  # default
+        ),
+    )
+
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
+            vad_analyzer=SileroVADAnalyzer(),  # default stop_secs=0.2, already snappy
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=smart_turn)],
+            ),
         ),
     )
 
