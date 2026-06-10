@@ -23,6 +23,7 @@ Run the bot using::
     uv run bot.py
 """
 
+import asyncio
 import json
 import os
 from datetime import UTC, datetime
@@ -30,6 +31,7 @@ from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
+from openai import AsyncOpenAI
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -86,6 +88,17 @@ def save_transcript_file(session_id: str, transcript: list[dict]) -> None:
         json.dumps({"session_id": session_id, "turns": transcript}, indent=2)
     )
     print(f"[Bot] Saved transcript: {path.name} ({len(transcript)} turns)")
+
+
+def save_summaries_file(session_id: str, summaries: list[dict]) -> None:
+    """Write the rolling summaries to transcripts/<session_id>_summaries.json."""
+    transcripts_dir = Path(__file__).parent / "transcripts"
+    transcripts_dir.mkdir(exist_ok=True)
+    path = transcripts_dir / f"{session_id}_summaries.json"
+    path.write_text(
+        json.dumps({"session_id": session_id, "summaries": summaries}, indent=2)
+    )
+    print(f"[Bot] Saved summaries: {path.name} ({len(summaries)} summaries)")
 
 
 load_dotenv(override=True)
@@ -187,6 +200,175 @@ class ConversationPersister(FrameProcessor):
             await db.save_message(self._session_id, sender, text)
 
 
+class RollingSummarizer(FrameProcessor):
+    """Maintains a growing clinical summary of the conversation.
+
+    Counts completed turns via LLMFullResponseEndFrame (one per assistant
+    response). Every SUMMARY_INTERVAL turns it asks an NVIDIA NIM model to fold
+    the most recent turns (plus any prior summary) into a single 2-3 sentence
+    running summary with an emotional tag, then PREPENDS that summary as a
+    system message at position 1 of the LLMContext — right after the main
+    system prompt at position 0. The original turns are never deleted, so the
+    summary accumulates and nothing is lost.
+
+    The NIM call runs in a background task so it never stalls the audio
+    pipeline; the context is mutated synchronously once the call returns.
+    """
+
+    SUMMARY_INTERVAL = 12
+    EMOTIONAL_TAGS = (
+        "anxious",
+        "sad",
+        "angry",
+        "hopeful",
+        "avoidant",
+        "numb",
+        "opening_up",
+    )
+    SUMMARY_PREFIX = "Session summary so far:"
+
+    def __init__(
+        self,
+        context: LLMContext,
+        llm_client: AsyncOpenAI,
+        model: str = "meta/llama-3.1-8b-instruct",
+    ):
+        super().__init__()
+        self._context = context
+        self._llm = llm_client
+        self._model = model
+        self.turn_count = 0
+        # Exposed so the session can persist/forward the summaries (e.g. to Weave).
+        self.summaries: list[dict] = []
+        # Accumulated summary text (without the formatting/tag) for the next merge.
+        self._accumulated_summary: str | None = None
+        self._summarizing = False
+        self._summarize_task: asyncio.Task | None = None
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        # One LLMFullResponseEndFrame == one completed assistant turn.
+        if isinstance(frame, LLMFullResponseEndFrame):
+            self.turn_count += 1
+            if self.turn_count % self.SUMMARY_INTERVAL == 0 and not self._summarizing:
+                self._summarizing = True
+                # Run in the background so summarization latency never blocks TTS.
+                self._summarize_task = asyncio.create_task(
+                    self._run_summary(self.turn_count)
+                )
+        await self.push_frame(frame, direction)
+
+    async def _run_summary(self, turn_number: int):
+        try:
+            recent = self._recent_turns_text()
+            if not recent:
+                return
+            result = await self._summarize(self._accumulated_summary, recent)
+            if not result:
+                return
+            summary_text, tag = result
+            # Combined summary (old + new turns) becomes the basis for next merge.
+            self._accumulated_summary = summary_text
+            content = f"{self.SUMMARY_PREFIX} {summary_text} Emotional state: {tag}"
+            self._insert_summary(content)
+            self.summaries.append(
+                {
+                    "turn": turn_number,
+                    "summary": summary_text,
+                    "emotional_tag": tag,
+                    "timestamp": datetime.now(UTC).isoformat(),
+                }
+            )
+            print(f"[Summarizer] Turn {turn_number} summarized → emotional_tag: {tag}")
+        except Exception as exc:
+            logger.error(f"[Summarizer] Summarization failed at turn {turn_number}: {exc}")
+        finally:
+            self._summarizing = False
+
+    def _recent_turns_text(self) -> str:
+        """Render the last SUMMARY_INTERVAL user/assistant turns as dialogue."""
+        convo = [
+            m
+            for m in self._context.get_messages()
+            if isinstance(m, dict) and m.get("role") in ("user", "assistant")
+        ]
+        lines = []
+        for m in convo[-self.SUMMARY_INTERVAL :]:
+            speaker = "Client" if m.get("role") == "user" else "Therapist"
+            text = _extract_text(m.get("content")).strip()
+            if text:
+                lines.append(f"{speaker}: {text}")
+        return "\n".join(lines)
+
+    def _is_summary_message(self, m: Any) -> bool:
+        return (
+            isinstance(m, dict)
+            and m.get("role") == "system"
+            and isinstance(m.get("content"), str)
+            and m["content"].startswith(self.SUMMARY_PREFIX)
+        )
+
+    def _insert_summary(self, content: str):
+        """Put the summary at position 1, keeping the system prompt at position 0.
+
+        If a previous summary already sits at position 1 it is replaced (the new
+        content already merges old + new). All conversation turns are preserved.
+        """
+        messages = list(self._context.get_messages())
+        if not messages:
+            return
+        system_msg = messages[0]  # main system prompt — always position 0
+        rest = messages[1:]
+        if rest and self._is_summary_message(rest[0]):
+            rest = rest[1:]  # drop the old summary; we replace it
+        summary_msg = {"role": "system", "content": content}
+        self._context.set_messages([system_msg, summary_msg, *rest])
+
+    async def _summarize(self, old_summary: str | None, recent_turns: str):
+        """Call NIM to merge old summary + recent turns. Returns (summary, tag)."""
+        user_content = (
+            f"Existing running summary (may be empty):\n{old_summary or '(none)'}\n\n"
+            f"New conversation turns to fold in:\n{recent_turns}\n\n"
+            "Merge the existing summary and the new turns into ONE running summary "
+            "of 2-3 sentences capturing the client's core concerns and current "
+            "focus. Then choose the single emotional tag that best fits the "
+            "client's current state, from EXACTLY this list: "
+            f"{', '.join(self.EMOTIONAL_TAGS)}.\n\n"
+            'Return ONLY valid JSON: {"summary": "<2-3 sentences>", '
+            '"emotional_tag": "<one tag>"}. No markdown, no explanation.'
+        )
+        response = await self._llm.chat.completions.create(
+            model=self._model,
+            temperature=0.3,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a concise clinical note-taker for a therapy session.",
+                },
+                {"role": "user", "content": user_content},
+            ],
+        )
+        raw = response.choices[0].message.content or ""
+        return self._parse(raw)
+
+    def _parse(self, raw: str):
+        try:
+            data = json.loads(raw)
+        except Exception:
+            try:
+                data = json.loads(raw[raw.index("{") : raw.rindex("}") + 1])
+            except Exception:
+                logger.warning(f"[Summarizer] Could not parse summary JSON: {raw[:120]!r}")
+                return None
+        summary = str(data.get("summary", "")).strip()
+        tag = str(data.get("emotional_tag", "")).strip().lower()
+        if not summary:
+            return None
+        if tag not in self.EMOTIONAL_TAGS:
+            tag = "numb"  # neutral fallback when the model returns an off-list tag
+        return summary, tag
+
+
 async def run_bot(
     transport: BaseTransport,
     session_id: str | None,
@@ -270,8 +452,22 @@ async def run_bot(
 
     persister = ConversationPersister(context, session_id)
 
+    # Rolling summarizer LLM client — prefer NVIDIA NIM, fall back to OpenAI so
+    # it still works when NVIDIA_API_KEY is unset (mirrors weave_eval/improver).
+    if os.getenv("NVIDIA_API_KEY"):
+        summarizer_client = AsyncOpenAI(
+            api_key=os.getenv("NVIDIA_API_KEY"),
+            base_url=os.getenv("NVIDIA_BASE_URL", "https://integrate.api.nvidia.com/v1"),
+        )
+        summarizer_model = "meta/llama-3.1-8b-instruct"
+    else:
+        summarizer_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        summarizer_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    rolling_summarizer = RollingSummarizer(context, summarizer_client, model=summarizer_model)
+
     # Pipeline - persister sits right after the LLM so it observes response-end
-    # frames; it reads the shared context for message text.
+    # frames; it reads the shared context for message text. The rolling
+    # summarizer sits just after it, watching the same response-end frames.
     pipeline = Pipeline(
         [
             transport.input(),
@@ -279,6 +475,7 @@ async def run_bot(
             user_aggregator,
             llm,
             persister,
+            rolling_summarizer,
             tts,
             transport.output(),
             assistant_aggregator,
@@ -347,8 +544,10 @@ async def run_bot(
                 logger.warning(f"No transcript to evaluate for session {session_id}")
                 return
             save_transcript_file(session_id, transcript)
+            save_summaries_file(session_id, rolling_summarizer.summaries)
             # Record the prompt version used for THIS session before any rewrite.
             current_version = improver.load_latest_prompt()[1]
+            weave_eval.init_weave()
             scores = await weave_eval.evaluate_session(transcript)
             new_version = await improver.maybe_improve(scores)
             improver.save_report(session_id, scores, current_version, new_version)

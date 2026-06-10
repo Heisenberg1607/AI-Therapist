@@ -43,7 +43,18 @@ const ChatPage = () => {
   const transcriptRef = useRef<TranscriptTurn[]>([]);
   const answersRef = useRef<OnboardingAnswers>({});
 
-  const dismissCrisis = useCallback(() => setIsCrisis(false), []);
+  // Crisis flag from the bot → show the modal and pause the conversation so the
+  // bot stops listening while the user reads the support resources.
+  const handleCrisis = useCallback(() => {
+    setIsCrisis(true);
+    voiceCallRef.current?.pause();
+  }, []);
+
+  // "I am safe — continue session" → hide the modal and resume the conversation.
+  const dismissCrisis = useCallback(() => {
+    setIsCrisis(false);
+    voiceCallRef.current?.resume();
+  }, []);
 
   // Already-onboarded users skip onboarding — rebuild the prompt from their
   // stored answers so the gate below passes without asking again.
@@ -220,7 +231,7 @@ const ChatPage = () => {
             });
           }
         }}
-        onCrisis={() => setIsCrisis(true)}
+        onCrisis={handleCrisis}
       />
 
       {isCrisis && <CrisisModal onDismiss={dismissCrisis} />}

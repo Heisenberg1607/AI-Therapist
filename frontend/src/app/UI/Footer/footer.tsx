@@ -93,7 +93,7 @@ const footer = () => {
                 </li>
                 <li>
                   <a
-                    href="#"
+                    href="/privacy"
                     className="text-gray-400 hover:text-green-400 transition-colors"
                   >
                     Privacy & Security
@@ -138,13 +138,13 @@ const footer = () => {
             </p>
             <div className="flex space-x-6 text-sm">
               <a
-                href="#"
+                href="/privacy"
                 className="text-gray-400 hover:text-green-400 transition-colors"
               >
                 Privacy Policy
               </a>
               <a
-                href="#"
+                href="/terms"
                 className="text-gray-400 hover:text-green-400 transition-colors"
               >
                 Terms of Service

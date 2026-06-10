@@ -44,6 +44,10 @@ export type ConnectOverrides = {
 export type PipecatVoiceHandle = {
   connect: (overrides?: ConnectOverrides) => Promise<void>;
   disconnect: () => Promise<void>;
+  /** Pause the conversation by muting the mic (e.g. while the crisis modal is up). */
+  pause: () => void;
+  /** Resume the conversation by re-enabling the mic. */
+  resume: () => void;
 };
 
 export type PipecatVoiceProps = {
@@ -205,6 +209,14 @@ export const PipecatVoice = forwardRef<PipecatVoiceHandle, PipecatVoiceProps>(
         },
         disconnect: async () => {
           await client.disconnect();
+        },
+        // Muting the local mic stops new user turns from reaching the bot, so
+        // the conversation effectively pauses; re-enabling lets it continue.
+        pause: () => {
+          client.enableMic(false);
+        },
+        resume: () => {
+          client.enableMic(true);
         },
       }),
       [client],
