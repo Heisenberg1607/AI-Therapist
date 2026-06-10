@@ -101,6 +101,9 @@ export const startSession = async (req: AuthRequest, res: Response) => {
 
     const session = await createSession(userId);
 
+    console.log("session created successfully",session);
+    
+
     // Layer 3 — Runtime: session created via HTTP
     logger.info(
       {

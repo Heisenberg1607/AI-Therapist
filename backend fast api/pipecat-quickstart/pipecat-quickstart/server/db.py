@@ -55,19 +55,37 @@ async def save_message(session_id: str, sender: str, content: str) -> None:
     pool = await get_pool()
     if pool is None:
         return
+    message_id = str(uuid.uuid4())
+    created_at = datetime.now(UTC).replace(tzinfo=None)
     try:
         async with pool.acquire() as conn:
-            await conn.execute(
+            status = await conn.execute(
                 'INSERT INTO "Message" ("id", "sessionId", "sender", "content", "createdAt") '
                 'VALUES ($1, $2, $3::"Sender", $4, $5)',
-                str(uuid.uuid4()),
+                message_id,
                 session_id,
                 sender,
                 content,
-                datetime.now(UTC),
+                # "createdAt" is `timestamp without time zone`; asyncpg rejects a
+                # tz-aware datetime against it ("can't subtract offset-naive and
+                # offset-aware datetimes"). Store naive UTC, matching how Prisma
+                # persists DateTime on the Node side.
+                created_at,
+            )
+        # asyncpg returns "INSERT 0 1" when exactly one row was written.
+        if status == "INSERT 0 1":
+            logger.info(
+                f"Message stored in Supabase | id={message_id} session={session_id} "
+                f"sender={sender} createdAt={created_at.isoformat()} "
+                f"content={content[:80]!r}"
+            )
+        else:
+            logger.error(
+                f"Data not stored | unexpected insert status {status!r} "
+                f"for session {session_id}"
             )
     except Exception as exc:
-        logger.error(f"Failed to save message for session {session_id}: {exc}")
+        logger.error(f"Data not stored | session={session_id} error: {exc}")
 
 
 async def get_messages_by_session(session_id: str) -> list[dict]:

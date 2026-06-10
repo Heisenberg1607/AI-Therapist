@@ -11,24 +11,38 @@ import {
 import { PipecatClient } from "@pipecat-ai/client-js";
 import { PipecatClientAudio, PipecatClientProvider } from "@pipecat-ai/client-react";
 import { DailyTransport } from "@pipecat-ai/daily-transport";
+import { SmallWebRTCTransport } from "@pipecat-ai/small-webrtc-transport";
 
-// The Pipecat Cloud agent's public start endpoint.
 const BASE_URL =
   process.env.NEXT_PUBLIC_PIPECAT_BOT_URL ?? "http://localhost:7860";
-const CONNECT_ENDPOINT = "/start";
 const BOT_KEY =
   process.env.NEXT_PUBLIC_PIPECAT_BOT_KEY ??
   process.env.NEXT_PUBLIC_PIPECAT_PUBLIC_KEY;
 
-function resolveStartEndpoint(baseUrl: string): string {
-  const trimmed = baseUrl.trim().replace(/\/+$/, "");
-  return trimmed.endsWith("/start")
-    ? trimmed
-    : `${trimmed}${CONNECT_ENDPOINT}`;
+// "smallwebrtc" → local bot (no Daily account needed)
+// "daily"       → Pipecat Cloud (production)
+const TRANSPORT = process.env.NEXT_PUBLIC_PIPECAT_TRANSPORT ?? "daily";
+
+function resolveBaseUrl(baseUrl: string): string {
+  return baseUrl.trim().replace(/\/+$/, "");
 }
 
+function resolveStartEndpoint(baseUrl: string): string {
+  const trimmed = resolveBaseUrl(baseUrl);
+  return trimmed.endsWith("/start") ? trimmed : `${trimmed}/start`;
+}
+
+/** Session identity passed to connect(). Lets the caller hand in freshly
+ *  created values (e.g. a sessionId from startSession()) without waiting for a
+ *  React re-render to propagate them into props. */
+export type ConnectOverrides = {
+  sessionId?: string | null;
+  userId?: string | null;
+  systemPrompt?: string | null;
+};
+
 export type PipecatVoiceHandle = {
-  connect: () => Promise<void>;
+  connect: (overrides?: ConnectOverrides) => Promise<void>;
   disconnect: () => Promise<void>;
 };
 
@@ -78,7 +92,10 @@ export const PipecatVoice = forwardRef<PipecatVoiceHandle, PipecatVoiceProps>(
     const client = useMemo(() => {
       const cb = () => bag.current;
       return new PipecatClient({
-        transport: new DailyTransport({ bufferLocalAudioUntilBotReady: true }),
+        transport:
+          TRANSPORT === "smallwebrtc"
+            ? new SmallWebRTCTransport()
+            : new DailyTransport({ bufferLocalAudioUntilBotReady: true }),
         enableMic: true,
         enableCam: false,
         callbacks: {
@@ -109,56 +126,82 @@ export const PipecatVoice = forwardRef<PipecatVoiceHandle, PipecatVoiceProps>(
     useImperativeHandle(
       ref,
       () => ({
-        connect: async () => {
-          if (!BOT_KEY) {
-            throw new Error(
-              "Missing NEXT_PUBLIC_PIPECAT_BOT_KEY (or NEXT_PUBLIC_PIPECAT_PUBLIC_KEY) in frontend env",
-            );
-          }
-
-          // Ask Pipecat Cloud to spin up a Daily room for this agent run. The
-          // public start endpoint requires a Bearer public key and only returns
-          // a room when createDailyRoom is true. Session identity is nested in
-          // `body` so it arrives at the bot as runner_args.body.
-          const res = await fetch(resolveStartEndpoint(BASE_URL), {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${BOT_KEY}`,
-            },
-            body: JSON.stringify({
-              createDailyRoom: true,
-              body: {
-                sessionId: bag.current.sessionId ?? null,
-                userId: bag.current.userId ?? null,
-                systemPrompt: bag.current.systemPrompt ?? null,
-              },
-            }),
-          });
-
-          if (!res.ok) {
-            const detail = await res.text().catch(() => "");
-            throw new Error(
-              `Failed to start bot (${res.status} ${res.statusText}) ${detail}`,
-            );
-          }
-
-          const payload = (await res.json()) as {
-            dailyRoom?: string;
-            dailyToken?: string;
-            roomUrl?: string;
-            token?: string;
-            url?: string;
+        connect: async (overrides?: ConnectOverrides) => {
+          const sessionBody = {
+            sessionId: overrides?.sessionId ?? bag.current.sessionId ?? null,
+            userId: overrides?.userId ?? bag.current.userId ?? null,
+            systemPrompt:
+              overrides?.systemPrompt ?? bag.current.systemPrompt ?? null,
           };
 
-          const dailyRoom = payload.dailyRoom ?? payload.roomUrl ?? payload.url;
-          const dailyToken = payload.dailyToken ?? payload.token;
+          if (TRANSPORT === "smallwebrtc") {
+            // Local SmallWebRTC: POST /start to register the session body with
+            // Pipecat, then connect via the returned sessions proxy URL. This
+            // threads our sessionId through to runner_args.body in bot.py.
+            const res = await fetch(resolveStartEndpoint(BASE_URL), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ transport: "webrtc", body: sessionBody }),
+            });
 
-          if (!dailyRoom) {
-            throw new Error("Start endpoint did not return a Daily room URL");
+            if (!res.ok) {
+              const detail = await res.text().catch(() => "");
+              throw new Error(
+                `Failed to start bot (${res.status} ${res.statusText}) ${detail}`,
+              );
+            }
+
+            const payload = (await res.json()) as { sessionId?: string };
+            if (!payload.sessionId) {
+              throw new Error("Start endpoint did not return a sessionId");
+            }
+
+            const webrtcUrl = `${resolveBaseUrl(BASE_URL)}/sessions/${payload.sessionId}/api/offer`;
+            await client.connect({ webrtcUrl } as Parameters<typeof client.connect>[0]);
+          } else {
+            // Pipecat Cloud / Daily: requires a Bearer public key and
+            // createDailyRoom: true. Session identity is nested in `body` so
+            // it arrives at the bot as runner_args.body.
+            if (!BOT_KEY) {
+              throw new Error(
+                "Missing NEXT_PUBLIC_PIPECAT_BOT_KEY (or NEXT_PUBLIC_PIPECAT_PUBLIC_KEY) in frontend env",
+              );
+            }
+
+            const res = await fetch(resolveStartEndpoint(BASE_URL), {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${BOT_KEY}`,
+              },
+              body: JSON.stringify({ createDailyRoom: true, body: sessionBody }),
+            });
+
+            if (!res.ok) {
+              const detail = await res.text().catch(() => "");
+              throw new Error(
+                `Failed to start bot (${res.status} ${res.statusText}) ${detail}`,
+              );
+            }
+
+            const payload = (await res.json()) as {
+              dailyRoom?: string;
+              dailyToken?: string;
+              roomUrl?: string;
+              token?: string;
+              url?: string;
+            };
+
+            const dailyRoom =
+              payload.dailyRoom ?? payload.roomUrl ?? payload.url;
+            const dailyToken = payload.dailyToken ?? payload.token;
+
+            if (!dailyRoom) {
+              throw new Error("Start endpoint did not return a Daily room URL");
+            }
+
+            await client.connect({ url: dailyRoom, token: dailyToken });
           }
-
-          await client.connect({ url: dailyRoom, token: dailyToken });
         },
         disconnect: async () => {
           await client.disconnect();

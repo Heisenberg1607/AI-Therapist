@@ -7,6 +7,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "pipecat-ai[cartesia,daily,deepgram,openai,rnnoise,runner,silero,webrtc]",
     "pipecatcloud",
+    "weave>=0.52.42",
 ]
 
 [dependency-groups]

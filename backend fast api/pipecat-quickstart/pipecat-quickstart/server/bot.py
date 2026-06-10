@@ -59,20 +59,22 @@ from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
 from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
-import cekura
 import db
+import improver
+import weave_eval
 
 from pathlib import Path
 
 
+PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+
 def load_latest_prompt() -> str:
-    prompts_dir = Path(__file__).parent / "prompts"
-    files = sorted(prompts_dir.glob("v*.txt"))
-    if not files:
-        return "You are a helpful voice assistant. Keep responses concise and conversational."
-    latest = files[-1]
-    print(f"[Bot] Loading prompt: {latest.name}")
-    return latest.read_text().strip()
+    # Prompt versioning now lives in improver (cekura was removed); delegate to
+    # it so the bot still loads the highest-versioned prompt.
+    text, name = improver.load_latest_prompt()
+    print(f"[Bot] Loading prompt: {name}")
+    return text
 
 
 def save_transcript_file(session_id: str, transcript: list[dict]) -> None:
@@ -329,6 +331,30 @@ async def run_bot(
         context.add_message({"role": "user", "content": SESSION_START_MESSAGE})
         await worker.queue_frames([LLMRunFrame()])
 
+    session_finalized = False
+
+    async def finalize_session(reason: str) -> None:
+        """Run once when a session ends: persist transcript, Weave eval, prompt rewrite."""
+        nonlocal session_finalized
+        if session_finalized:
+            return
+        session_finalized = True
+        logger.info(f"Finalizing session {session_id} ({reason})")
+        try:
+            await persister.flush()
+            transcript = persister.transcript
+            if not transcript:
+                logger.warning(f"No transcript to evaluate for session {session_id}")
+                return
+            save_transcript_file(session_id, transcript)
+            # Record the prompt version used for THIS session before any rewrite.
+            current_version = improver.load_latest_prompt()[1]
+            scores = await weave_eval.evaluate_session(transcript)
+            new_version = await improver.maybe_improve(scores)
+            improver.save_report(session_id, scores, current_version, new_version)
+        except Exception as e:
+            logger.error(f"Error during session finalization: {e}")
+
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
@@ -336,18 +362,14 @@ async def run_bot(
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
         logger.info("Client disconnected")
-        try:
-            # Capture the trailing assistant message.
-            await persister.flush()
-            transcript = await db.get_messages_by_session(session_id) if session_id else []
-            if not transcript:
-                transcript = persister.transcript
-            save_transcript_file(session_id, transcript)
-            await cekura.send_transcript(session_id, transcript)
-        except Exception as e:
-            logger.error(f"Error during disconnect cleanup: {e}")
-        finally:
-            await worker.cancel()
+        await finalize_session("client disconnected")
+        await worker.cancel()
+
+    @worker.event_handler("on_pipeline_finished")
+    async def on_pipeline_finished(worker, frame):
+        # Idle timeout and transport-side closes cancel the worker without always
+        # firing on_client_disconnected (SmallWebRTC skips it when _closing=True).
+        await finalize_session(f"pipeline finished ({type(frame).__name__})")
 
     runner = WorkerRunner(handle_sigint=False)
 

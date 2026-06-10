@@ -83,7 +83,14 @@ const ChatPage = () => {
       setSessionStarted(true);
       startedAtRef.current = Date.now();
       transcriptRef.current = [];
-      await voiceCallRef.current?.connect();
+      // Pass the fresh sessionId straight to connect(): setSessionId above won't
+      // have propagated into <PipecatVoice>'s props by the time connect() reads
+      // them, so without this the bot would receive a null sessionId.
+      await voiceCallRef.current?.connect({
+        sessionId: data.sessionId,
+        userId: user?.id ?? null,
+        systemPrompt,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start session";
       setError(msg);
