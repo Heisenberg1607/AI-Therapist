@@ -5,6 +5,7 @@ LLM judge. The scoring function is a Weave op, so every evaluation is traced
 into the ``ai-therapist-maya`` Weave project.
 """
 
+import asyncio
 import json
 import os
 from typing import Any
@@ -18,9 +19,15 @@ from openai import AsyncOpenAI
 # environment here too — weave.init() and the judge client both read from it.
 load_dotenv()
 
+# Weave project. Override per environment with WEAVE_PROJECT / WANDB_ENTITY.
+WEAVE_PROJECT = os.getenv("WEAVE_PROJECT", "ai-therapist-maya")
+
 # Defer weave.init() until evaluate_session runs so Weave does not autopatch
 # the live conversation OpenAI client (that breaks Pipecat's LLM service).
+# `_weave_initialized` guards the one-shot attempt; `_weave_enabled` records
+# whether that attempt actually produced a client (tracing is active).
 _weave_initialized = False
+_weave_enabled = False
 
 # Judge model preference: NVIDIA NIM when configured, else OpenAI.
 NIM_MODEL = "meta/llama-3.1-8b-instruct"
@@ -141,17 +148,64 @@ def _judge_op_output(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _weave_target() -> str:
+    """Project name, entity-qualified when WANDB_ENTITY is set. Production has
+    no ~/.netrc to supply a default entity, so allow an explicit override."""
+    entity = os.getenv("WANDB_ENTITY")
+    return f"{entity}/{WEAVE_PROJECT}" if entity else WEAVE_PROJECT
+
+
 def _ensure_weave() -> None:
-    global _weave_initialized
+    """Initialize Weave once per process. Never raises.
+
+    In production (headless Pipecat Cloud container) there is no ~/.netrc, so
+    Weave can only authenticate via WANDB_API_KEY. Without it, weave.init()
+    blocks on an interactive login prompt and then raises — which would kill the
+    entire session finalization. So we only attempt init when a key is present,
+    and swallow any failure: the judge ops run untraced rather than not at all.
+    """
+    global _weave_initialized, _weave_enabled
     if _weave_initialized:
         return
-    # Do not autopatch OpenAI globally — Pipecat's live LLM uses the same SDK.
-    weave.init(
-        "ai-therapist-maya",
-        settings={"implicitly_patch_integrations": False},
-    )
-    _weave_initialized = True
-    logger.info("Weave initialized for session evaluation (project: ai-therapist-maya)")
+    _weave_initialized = True  # one attempt only, success or not
+
+    if not os.getenv("WANDB_API_KEY"):
+        logger.warning(
+            "WANDB_API_KEY not set — Weave tracing disabled; session scoring "
+            "will still run (untraced). Set WANDB_API_KEY in the deploy secrets "
+            "to enable production tracing."
+        )
+        return
+
+    try:
+        # Do not autopatch OpenAI globally — Pipecat's live LLM uses the same SDK.
+        weave.init(
+            _weave_target(),
+            settings={"implicitly_patch_integrations": False},
+        )
+        _weave_enabled = True
+        logger.info(f"Weave initialized for session evaluation (project: {_weave_target()})")
+    except Exception as exc:
+        logger.warning(f"Weave init failed ({exc}); session scoring will run untraced")
+
+
+async def flush_weave() -> None:
+    """Block until pending Weave traces upload, then return. No-op when tracing
+    is disabled. Must run before the worker/process is torn down — Weave uploads
+    on a background thread, so without this the session's traces never reach W&B
+    in production (the container exits the moment finalization completes).
+
+    flush() is synchronous and joins the uploader, so run it off the event loop.
+    """
+    if not _weave_enabled:
+        return
+    try:
+        client = weave.get_client()
+        if client is not None:
+            await asyncio.to_thread(client.flush)
+            logger.info("Weave traces flushed")
+    except Exception as exc:
+        logger.warning(f"Weave flush failed: {exc}")
 
 
 def _judge_client() -> tuple[AsyncOpenAI, str]:
@@ -257,6 +311,12 @@ async def evaluate_session(transcript: list[dict]) -> dict:
 
     Returns a dict mapping each metric in ``METRIC_KEYS`` to a float score.
     Falls back to 3.0 for every metric if the judge call or JSON parse fails.
+
+    Flushes Weave before returning so the trace is uploaded even when the caller
+    tears the process down immediately afterwards (as Pipecat Cloud does).
     """
     init_weave()
-    return await _evaluate_session_traced(transcript)
+    try:
+        return await _evaluate_session_traced(transcript)
+    finally:
+        await flush_weave()
