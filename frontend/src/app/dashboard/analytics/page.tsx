@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Card,
   CardContent,
@@ -8,8 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -20,491 +18,514 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import {
   BarChart3,
+  Clock,
+  MessageSquare,
+  CalendarDays,
+  Flame,
+  AlertTriangle,
   TrendingUp,
   TrendingDown,
-  Users,
-  Clock,
-  Target,
-  Activity,
   Brain,
-  Heart,
-  Zap,
-  CheckCircle,
-  ArrowUp,
-  ArrowDown,
+  Loader2,
+  Activity,
 } from "lucide-react";
+import { ProtectedRoute } from "../../Components/ProtectedRoute";
+import {
+  getAnalyticsApi,
+  type AnalyticsRange,
+  type UserAnalytics,
+} from "../../lib/api";
+import { moodToScore } from "@/lib/sessionStorage";
 
-export default function AnalyticsPage() {
-  const [timeRange, setTimeRange] = useState("7d");
-  const [activeTab, setActiveTab] = useState("overview");
+const SCORE_LABELS: Record<number, string> = {
+  1: "Overwhelmed",
+  2: "Numb",
+  3: "Sad",
+  4: "Anxious",
+  5: "Angry",
+  6: "Okay",
+};
 
-  const realTimeMetrics = {
-    activeSessions: 3,
-    avgResponseTime: 1.2,
-    systemUptime: 99.8,
-    clientSatisfaction: 4.7,
-  };
+const GREEN = "#22c55e";
 
-  const performanceMetrics = [
-    { metric: "Session Completion Rate", value: 94, change: +5, trend: "up" },
-    { metric: "Client Retention Rate", value: 87, change: -2, trend: "down" },
-    { metric: "Average Session Duration", value: 42, change: +3, trend: "up" },
-    { metric: "Response Accuracy", value: 91, change: +7, trend: "up" },
-    { metric: "Client Engagement Score", value: 78, change: +12, trend: "up" },
-    {
-      metric: "Crisis Intervention Success",
-      value: 96,
-      change: +1,
-      trend: "up",
-    },
-  ];
+function formatTotalTime(seconds: number): string {
+  const totalMin = Math.round(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  return `${h}h ${m}m`;
+}
 
-  const clientEngagement = [
-    { timeSlot: "9:00 AM", sessions: 12, satisfaction: 4.8 },
-    { timeSlot: "11:00 AM", sessions: 18, satisfaction: 4.6 },
-    { timeSlot: "1:00 PM", sessions: 15, satisfaction: 4.7 },
-    { timeSlot: "3:00 PM", sessions: 22, satisfaction: 4.9 },
-    { timeSlot: "5:00 PM", sessions: 19, satisfaction: 4.5 },
-    { timeSlot: "7:00 PM", sessions: 8, satisfaction: 4.4 },
-  ];
+function formatMinutes(seconds: number): string {
+  return `${Math.round(seconds / 60)}m`;
+}
 
-  const sessionEffectiveness = [
-    {
-      category: "Anxiety Management",
-      sessions: 45,
-      improvement: 82,
-      avgDuration: 38,
-    },
-    {
-      category: "Depression Support",
-      sessions: 38,
-      improvement: 76,
-      avgDuration: 44,
-    },
-    {
-      category: "Stress Relief",
-      sessions: 32,
-      improvement: 88,
-      avgDuration: 35,
-    },
-    {
-      category: "Relationship Issues",
-      sessions: 28,
-      improvement: 71,
-      avgDuration: 48,
-    },
-    {
-      category: "Sleep Disorders",
-      sessions: 22,
-      improvement: 79,
-      avgDuration: 41,
-    },
-  ];
+function shortDate(iso: string): string {
+  const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
-  const predictiveInsights = [
-    {
-      insight: "Peak session demand expected between 3-5 PM this week",
-      confidence: 89,
-      type: "scheduling",
-      action: "Consider increasing availability",
-    },
-    {
-      insight:
-        "Client retention likely to improve by 8% with follow-up reminders",
-      confidence: 76,
-      type: "retention",
-      action: "Implement automated follow-ups",
-    },
-    {
-      insight: "Anxiety-related sessions show 15% better outcomes on weekdays",
-      confidence: 92,
-      type: "effectiveness",
-      action: "Optimize scheduling patterns",
-    },
-  ];
+function hourLabel(h: number): string {
+  const am = h < 12;
+  const hr = h % 12 === 0 ? 12 : h % 12;
+  return `${hr}${am ? "a" : "p"}`;
+}
+
+const cardClass = "bg-gray-900 border-gray-800";
+const chartGrid = "rgba(255,255,255,0.06)";
+const axisTick = { fill: "rgba(255,255,255,0.45)", fontSize: 11 };
+const tooltipStyle = {
+  background: "hsl(240, 20%, 8%)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  borderRadius: 12,
+  color: "#fff",
+} as const;
+
+function MetricCard({
+  title,
+  value,
+  subtitle,
+  icon,
+}: {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: ReactNode;
+}) {
+  return (
+    <Card className={cardClass}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-400">
+          {title}
+        </CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-white">{value}</div>
+        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AnalyticsView() {
+  const [range, setRange] = useState<AnalyticsRange>("30d");
+  const [data, setData] = useState<UserAnalytics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
+      const res = await getAnalyticsApi(range);
+      if (cancelled) return;
+      setData(res);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [range]);
+
+  const moodData = useMemo(
+    () =>
+      (data?.moodTimeline ?? []).map((m) => ({
+        label: shortDate(m.date),
+        score: moodToScore(m.mood),
+        mood: m.mood,
+      })),
+    [data],
+  );
+
+  const sessionsData = useMemo(
+    () =>
+      (data?.sessionsByDay ?? []).map((d) => ({
+        label: shortDate(d.date),
+        count: d.count,
+      })),
+    [data],
+  );
+
+  const topicData = useMemo(
+    () => (data?.topicDistribution ?? []).slice(0, 6),
+    [data],
+  );
+
+  const hourData = useMemo(
+    () =>
+      (data?.timeOfDay ?? []).map((h) => ({
+        label: hourLabel(h.hour),
+        count: h.count,
+      })),
+    [data],
+  );
+
+  const insights = useMemo(() => {
+    if (!data || data.totalSessions === 0) return [];
+    const out: string[] = [];
+    if (data.moodDistribution[0])
+      out.push(`Your most common starting mood is "${data.moodDistribution[0].mood}".`);
+    if (data.topicDistribution[0])
+      out.push(`You talk about "${data.topicDistribution[0].topic}" most often.`);
+    out.push(
+      `${data.sessionsThisWeek} session${data.sessionsThisWeek === 1 ? "" : "s"} in the last 7 days.`,
+    );
+    if (data.currentStreakDays > 1)
+      out.push(`You're on a ${data.currentStreakDays}-day streak.`);
+    if (moodData.length >= 2) {
+      const first = moodData[0].score;
+      const last = moodData[moodData.length - 1].score;
+      if (last > first) out.push("Your mood is trending up over this period.");
+      else if (last < first) out.push("Your mood has dipped over this period.");
+    }
+    out.push(`Your sessions average ${formatMinutes(data.avgDurationSec)}.`);
+    return out;
+  }, [data, moodData]);
+
+  if (loading && !data) {
+    return (
+      <div className="p-8 mt-10 flex items-center justify-center text-gray-500 text-sm h-[60vh]">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        Loading your analytics…
+      </div>
+    );
+  }
+
+  const empty = !data || data.totalSessions === 0;
 
   return (
     <div className="p-8 mt-10">
       <div className="flex items-center justify-between mb-8">
-        
-        <Select value={timeRange} onValueChange={setTimeRange}>
+        <h1 className="text-2xl font-bold text-white flex items-center">
+          <BarChart3 className="h-6 w-6 mr-2 text-green-500" />
+          Analytics
+        </h1>
+        <Select value={range} onValueChange={(v) => setRange(v as AnalyticsRange)}>
           <SelectTrigger className="w-32 bg-gray-900 border-gray-700 text-white">
             <SelectValue />
           </SelectTrigger>
           <SelectContent className="bg-gray-900 border-gray-700">
-            <SelectItem value="24h">24 Hours</SelectItem>
             <SelectItem value="7d">7 Days</SelectItem>
             <SelectItem value="30d">30 Days</SelectItem>
             <SelectItem value="90d">90 Days</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Real-time Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Active Sessions
-            </CardTitle>
-            <Activity className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {realTimeMetrics.activeSessions}
-            </div>
-            <p className="text-xs text-green-500">Live now</p>
+      {empty ? (
+        <Card className={cardClass}>
+          <CardContent className="py-16 text-center">
+            <Activity className="h-10 w-10 text-green-500 mx-auto mb-4" />
+            <p className="text-white font-medium">No sessions in this range yet</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Finish a conversation and your analytics will appear here.
+            </p>
           </CardContent>
         </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Avg Response Time
-            </CardTitle>
-            <Zap className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {realTimeMetrics.avgResponseTime}s
-            </div>
-            <p className="text-xs text-green-500">Excellent</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              System Uptime
-            </CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {realTimeMetrics.systemUptime}%
-            </div>
-            <p className="text-xs text-green-500">Stable</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Client Satisfaction
-            </CardTitle>
-            <Heart className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {realTimeMetrics.clientSatisfaction}/5.0
-            </div>
-            <p className="text-xs text-green-500">Above target</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="space-y-6"
-      >
-        <TabsList className="bg-gray-900 border border-gray-800">
-          <TabsTrigger
-            value="overview"
-            className="data-[state=active]:bg-green-500 data-[state=active]:text-black"
-          >
-            Overview
-          </TabsTrigger>
-          <TabsTrigger
-            value="performance"
-            className="data-[state=active]:bg-green-500 data-[state=active]:text-black"
-          >
-            Performance
-          </TabsTrigger>
-          <TabsTrigger
-            value="engagement"
-            className="data-[state=active]:bg-green-500 data-[state=active]:text-black"
-          >
-            Engagement
-          </TabsTrigger>
-          <TabsTrigger
-            value="insights"
-            className="data-[state=active]:bg-green-500 data-[state=active]:text-black"
-          >
-            Insights
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
-                  Performance Overview
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Key performance indicators
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {performanceMetrics.slice(0, 3).map((metric, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between"
-                    >
-                      <span className="text-gray-300 text-sm">
-                        {metric.metric}
-                      </span>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-white font-medium">
-                          {metric.value}%
-                        </span>
-                        <div
-                          className={`flex items-center ${
-                            metric.trend === "up"
-                              ? "text-green-500"
-                              : "text-red-400"
-                          }`}
-                        >
-                          {metric.trend === "up" ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          )}
-                          <span className="text-xs ml-1">
-                            {Math.abs(metric.change)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Users className="h-5 w-5 mr-2 text-green-500" />
-                  Client Activity
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Session distribution by time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-48 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700">
-                  <div className="text-center">
-                    <BarChart3 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <p className="text-gray-400">Activity timeline chart</p>
-                    <p className="text-sm text-gray-500">Peak hours: 3-5 PM</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      ) : (
+        <>
+          {/* Metric cards (real, user-specific) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <MetricCard
+              title="Total Sessions"
+              value={`${data.totalSessions}`}
+              subtitle={
+                data.daysSinceLast != null
+                  ? `Last session ${data.daysSinceLast}d ago`
+                  : undefined
+              }
+              icon={<MessageSquare className="h-4 w-4 text-green-500" />}
+            />
+            <MetricCard
+              title="Total Time"
+              value={formatTotalTime(data.totalDurationSec)}
+              subtitle="Time spent in sessions"
+              icon={<Clock className="h-4 w-4 text-green-500" />}
+            />
+            <MetricCard
+              title="Avg Session Length"
+              value={formatMinutes(data.avgDurationSec)}
+              icon={<BarChart3 className="h-4 w-4 text-green-500" />}
+            />
+            <MetricCard
+              title="This Week"
+              value={`${data.sessionsThisWeek}`}
+              subtitle={
+                data.currentStreakDays > 0
+                  ? `${data.currentStreakDays}-day streak`
+                  : "sessions"
+              }
+              icon={<Flame className="h-4 w-4 text-green-500" />}
+            />
           </div>
-        </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {performanceMetrics.map((metric, index) => (
-              <Card key={index} className="bg-gray-900 border-gray-800">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-white text-base">
-                    {metric.metric}
-                  </CardTitle>
+          <Tabs defaultValue="overview" className="space-y-6">
+            <TabsList className="bg-gray-900 border border-gray-800">
+              {["overview", "engagement", "insights"].map((t) => (
+                <TabsTrigger
+                  key={t}
+                  value={t}
+                  className="capitalize data-[state=active]:bg-green-500 data-[state=active]:text-black"
+                >
+                  {t}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+
+            {/* Overview: mood over time + sessions over time */}
+            <TabsContent value="overview" className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className={cardClass}>
+                  <CardHeader>
+                    <CardTitle className="text-white">Mood over time</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Starting mood per session
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {moodData.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-10 text-center">
+                        No mood data recorded yet.
+                      </p>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={256}>
+                        <LineChart data={moodData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                          <XAxis dataKey="label" tick={axisTick} tickLine={false} />
+                          <YAxis
+                            domain={[1, 6]}
+                            ticks={[1, 2, 3, 4, 5, 6]}
+                            width={92}
+                            tick={axisTick}
+                            tickLine={false}
+                            tickFormatter={(v: number) => SCORE_LABELS[v] ?? ""}
+                          />
+                          <Tooltip
+                            contentStyle={tooltipStyle}
+                            formatter={(_v, _n, item) => [
+                              (item?.payload as { mood?: string })?.mood ?? "",
+                              "Mood",
+                            ]}
+                          />
+                          <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke={GREEN}
+                            strokeWidth={2}
+                            dot={{ r: 3, fill: GREEN }}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className={cardClass}>
+                  <CardHeader>
+                    <CardTitle className="text-white">Sessions over time</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      When you showed up
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={256}>
+                      <BarChart data={sessionsData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                        <XAxis dataKey="label" tick={axisTick} tickLine={false} />
+                        <YAxis
+                          allowDecimals={false}
+                          tick={axisTick}
+                          tickLine={false}
+                          width={28}
+                        />
+                        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                        <Bar dataKey="count" fill={GREEN} radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Engagement: messages, topics, time-of-day */}
+            <TabsContent value="engagement" className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <MetricCard
+                  title="Total Messages"
+                  value={`${data.messages.total}`}
+                  subtitle={`${data.messages.avgPerSession} per session`}
+                  icon={<MessageSquare className="h-4 w-4 text-green-500" />}
+                />
+                <MetricCard
+                  title="Crisis Flags"
+                  value={`${data.crisisCount}`}
+                  subtitle={data.crisisCount === 0 ? "None — good" : "Sessions flagged"}
+                  icon={<AlertTriangle className="h-4 w-4 text-green-500" />}
+                />
+                <MetricCard
+                  title="Days Since Last"
+                  value={data.daysSinceLast != null ? `${data.daysSinceLast}` : "—"}
+                  subtitle="Since your last session"
+                  icon={<CalendarDays className="h-4 w-4 text-green-500" />}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className={cardClass}>
+                  <CardHeader>
+                    <CardTitle className="text-white">You vs Therapist</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Share of messages
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 pt-2">
+                    {(() => {
+                      const total = data.messages.total || 1;
+                      const userPct = Math.round((data.messages.user / total) * 100);
+                      return (
+                        <>
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-400">You</span>
+                              <span className="text-white">
+                                {data.messages.user} ({userPct}%)
+                              </span>
+                            </div>
+                            <Progress value={userPct} className="h-2" />
+                          </div>
+                          <div>
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-gray-400">Therapist</span>
+                              <span className="text-white">
+                                {data.messages.ai} ({100 - userPct}%)
+                              </span>
+                            </div>
+                            <Progress value={100 - userPct} className="h-2" />
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </CardContent>
+                </Card>
+
+                <Card className={cardClass}>
+                  <CardHeader>
+                    <CardTitle className="text-white">Time of day</CardTitle>
+                    <CardDescription className="text-gray-400">
+                      When you usually have sessions (UTC)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {hourData.length === 0 ? (
+                      <p className="text-sm text-gray-500 py-8 text-center">
+                        Not enough data yet.
+                      </p>
+                    ) : (
+                      <ResponsiveContainer width="100%" height={220}>
+                        <BarChart data={hourData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
+                          <XAxis dataKey="label" tick={axisTick} tickLine={false} />
+                          <YAxis allowDecimals={false} tick={axisTick} tickLine={false} width={28} />
+                          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                          <Bar dataKey="count" fill={GREEN} radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card className={cardClass}>
+                <CardHeader>
+                  <CardTitle className="text-white">What you talk about</CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Most common topics
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl font-bold text-white">
-                      {metric.value}%
-                    </span>
-                    <div
-                      className={`flex items-center ${
-                        metric.trend === "up"
-                          ? "text-green-500"
-                          : "text-red-400"
-                      }`}
-                    >
-                      {metric.trend === "up" ? (
-                        <TrendingUp className="h-4 w-4" />
-                      ) : (
-                        <TrendingDown className="h-4 w-4" />
-                      )}
-                      <span className="text-sm ml-1">
-                        {Math.abs(metric.change)}%
-                      </span>
-                    </div>
-                  </div>
-                  <Progress value={metric.value} className="h-2" />
+                  {topicData.length === 0 ? (
+                    <p className="text-sm text-gray-500 py-8 text-center">
+                      No topics recorded yet.
+                    </p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={Math.max(160, topicData.length * 44)}>
+                      <BarChart data={topicData} layout="vertical" margin={{ left: 16, right: 16 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} horizontal={false} />
+                        <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} />
+                        <YAxis
+                          type="category"
+                          dataKey="topic"
+                          width={140}
+                          tick={axisTick}
+                          tickLine={false}
+                        />
+                        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
+                        <Bar dataKey="count" fill={GREEN} radius={[0, 4, 4, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="engagement" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Clock className="h-5 w-5 mr-2 text-green-500" />
-                  Session Effectiveness by Category
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Performance across different therapy areas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {sessionEffectiveness.map((category, index) => (
-                    <div
-                      key={index}
-                      className="p-4 rounded-lg bg-gray-800 border border-gray-700"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-white font-medium">
-                          {category.category}
-                        </span>
-                        <Badge className="bg-green-500 text-black">
-                          {category.improvement}% improvement
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <span className="text-gray-400">Sessions: </span>
-                          <span className="text-white">
-                            {category.sessions}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-400">Avg Duration: </span>
-                          <span className="text-white">
-                            {category.avgDuration}min
-                          </span>
-                        </div>
-                      </div>
-                      <Progress
-                        value={category.improvement}
-                        className="h-2 mt-2"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gray-900 border-gray-800">
-              <CardHeader>
-                <CardTitle className="text-white flex items-center">
-                  <Activity className="h-5 w-5 mr-2 text-green-500" />
-                  Hourly Engagement Patterns
-                </CardTitle>
-                <CardDescription className="text-gray-400">
-                  Session volume and satisfaction by time
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {clientEngagement.map((slot, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg bg-gray-800"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <span className="text-white font-medium w-20">
-                          {slot.timeSlot}
-                        </span>
-                        <div className="flex items-center space-x-2">
-                          <Users className="h-4 w-4 text-green-500" />
-                          <span className="text-gray-300">
-                            {slot.sessions} sessions
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-yellow-500">
-                          ★ {slot.satisfaction}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="insights" className="space-y-6">
-          <Card className="bg-gray-900 border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Brain className="h-5 w-5 mr-2 text-green-500" />
-                Predictive Insights
-              </CardTitle>
-              <CardDescription className="text-gray-400">
-                AI-powered recommendations for your practice
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {predictiveInsights.map((insight, index) => (
-                  <div
-                    key={index}
-                    className="p-4 rounded-lg bg-gray-800 border border-gray-700"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <p className="text-white font-medium mb-1">
-                          {insight.insight}
-                        </p>
-                        <p className="text-gray-400 text-sm">
-                          {insight.action}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge
-                          variant={
-                            insight.confidence > 80 ? "default" : "secondary"
-                          }
-                          className={
-                            insight.confidence > 80
-                              ? "bg-green-500 text-black"
-                              : ""
-                          }
+            {/* Insights: real derived observations */}
+            <TabsContent value="insights" className="space-y-6">
+              <Card className={cardClass}>
+                <CardHeader>
+                  <CardTitle className="text-white flex items-center">
+                    <Brain className="h-5 w-5 mr-2 text-green-500" />
+                    Your patterns
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Observations from your own sessions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-3">
+                    {insights.map((text, i) => {
+                      const down = text.includes("dipped");
+                      return (
+                        <li
+                          key={i}
+                          className="flex items-start p-3 rounded-lg bg-gray-800 border border-gray-700"
                         >
-                          {insight.confidence}% confidence
-                        </Badge>
-                        {insight.type === "scheduling" && (
-                          <Target className="h-4 w-4 text-blue-400" />
-                        )}
-                        {insight.type === "retention" && (
-                          <Users className="h-4 w-4 text-purple-400" />
-                        )}
-                        {insight.type === "effectiveness" && (
-                          <TrendingUp className="h-4 w-4 text-green-400" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-green-500 text-green-500 bg-transparent"
-                      >
-                        Apply Recommendation
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                          {down ? (
+                            <TrendingDown className="h-4 w-4 text-red-400 mr-3 mt-0.5 shrink-0" />
+                          ) : (
+                            <TrendingUp className="h-4 w-4 text-green-500 mr-3 mt-0.5 shrink-0" />
+                          )}
+                          <span className="text-sm text-gray-200">{text}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
     </div>
+  );
+}
+
+export default function AnalyticsPage() {
+  return (
+    <ProtectedRoute>
+      <AnalyticsView />
+    </ProtectedRoute>
   );
 }

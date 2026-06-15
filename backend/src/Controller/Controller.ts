@@ -15,6 +15,7 @@ import {
   getSessionsByUser,
 } from "../Model/sessionModel";
 import { getNearbyClinics } from "../Model/clinicModel";
+import { getUserAnalytics, AnalyticsRange } from "../Model/analyticsModel";
 import { AuthRequest } from "../middleware/authMiddleware";
 import {
   createUser,
@@ -199,6 +200,23 @@ export const getSessionMessages = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("getSessionMessages error", error);
     res.status(500).json({ message: "Failed to fetch messages" });
+  }
+};
+
+const ANALYTICS_RANGES: AnalyticsRange[] = ["7d", "30d", "90d", "all"];
+
+// User-specific analytics aggregated from the user's sessions + messages.
+export const getAnalytics = async (req: AuthRequest, res: Response) => {
+  try {
+    const q = String(req.query.range);
+    const range = (ANALYTICS_RANGES as string[]).includes(q)
+      ? (q as AnalyticsRange)
+      : "30d";
+    const analytics = await getUserAnalytics(req.userId!, range);
+    res.status(200).json({ analytics });
+  } catch (error) {
+    console.error("getAnalytics error", error);
+    res.status(500).json({ message: "Failed to fetch analytics" });
   }
 };
 

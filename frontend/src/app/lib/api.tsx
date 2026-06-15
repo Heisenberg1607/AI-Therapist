@@ -56,6 +56,26 @@ export interface ConversationMessage {
   createdAt: string;
 }
 
+export type AnalyticsRange = "7d" | "30d" | "90d" | "all";
+
+// User-specific analytics aggregated server-side from the user's sessions + messages.
+export interface UserAnalytics {
+  range: AnalyticsRange;
+  totalSessions: number;
+  totalDurationSec: number;
+  avgDurationSec: number;
+  sessionsThisWeek: number;
+  currentStreakDays: number;
+  daysSinceLast: number | null;
+  crisisCount: number;
+  moodTimeline: { date: string; mood: string }[];
+  moodDistribution: { mood: string; count: number }[];
+  topicDistribution: { topic: string; count: number }[];
+  sessionsByDay: { date: string; count: number }[];
+  timeOfDay: { hour: number; count: number }[];
+  messages: { total: number; user: number; ai: number; avgPerSession: number };
+}
+
 interface LoginResponse {
   message: string;
   user: AuthUser;
@@ -230,6 +250,21 @@ export const getSessionMessagesApi = async (
   return Array.isArray(data.messages)
     ? (data.messages as ConversationMessage[])
     : [];
+};
+
+// Fetch the logged-in user's analytics for a time range. Returns null on error.
+export const getAnalyticsApi = async (
+  range: AnalyticsRange = "30d",
+): Promise<UserAnalytics | null> => {
+  const response = await fetch(`${API_BASE_URL}/analytics?range=${range}`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) removeToken();
+    return null;
+  }
+  const data = await response.json();
+  return (data.analytics as UserAnalytics) ?? null;
 };
 
 export interface ClinicsPage {

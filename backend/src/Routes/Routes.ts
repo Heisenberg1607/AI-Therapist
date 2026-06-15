@@ -10,6 +10,7 @@ import {
   saveSessionSummary,
   getSessions,
   getSessionMessages,
+  getAnalytics,
   getClinics,
 } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
@@ -84,6 +85,15 @@ router.post("/sessions/:sessionId/summary", authenticate, async (req, res, next)
 router.get("/sessions/:sessionId/messages", authenticate, async (req, res, next) => {
   try {
     await getSessionMessages(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// User-specific analytics (query: range = 7d|30d|90d|all)
+router.get("/analytics", authenticate, async (req, res, next) => {
+  try {
+    await getAnalytics(req, res);
   } catch (error) {
     next(error);
   }
