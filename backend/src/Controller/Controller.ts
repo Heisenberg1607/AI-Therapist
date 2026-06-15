@@ -4,7 +4,11 @@ import { AIgenerateResponse } from "../Service/Service";
 // import { generateSpeechFromMurf } from "../Service/MurfService";
 // import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
 import { Sender } from "@prisma/client";
-import { createMessage, getMessagesBySession } from "../Model/messageModel";
+import {
+  createMessage,
+  getMessagesBySession,
+  getMessagesForUserSession,
+} from "../Model/messageModel";
 import {
   createSession,
   updateSessionSummary,
@@ -180,6 +184,21 @@ export const getSessions = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("getSessions error", error);
     res.status(500).json({ message: "Failed to fetch sessions" });
+  }
+};
+
+// Full message thread for one of the user's sessions (ownership-scoped).
+export const getSessionMessages = async (req: AuthRequest, res: Response) => {
+  try {
+    const { sessionId } = req.params as { sessionId: string };
+    const messages = await getMessagesForUserSession(sessionId, req.userId!);
+    if (messages === null) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+    res.status(200).json({ messages });
+  } catch (error) {
+    console.error("getSessionMessages error", error);
+    res.status(500).json({ message: "Failed to fetch messages" });
   }
 };
 

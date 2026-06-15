@@ -47,6 +47,15 @@ export interface DbSession {
   crisisFlag: boolean;
 }
 
+// One turn in a session's transcript. `sender` is USER (the client) or AI (the bot).
+export interface ConversationMessage {
+  id: string;
+  sessionId: string;
+  sender: "USER" | "AI";
+  content: string;
+  createdAt: string;
+}
+
 interface LoginResponse {
   message: string;
   user: AuthUser;
@@ -203,6 +212,24 @@ export const getSessionsApi = async (): Promise<DbSession[]> => {
   if (!response.ok) return [];
   const data = await response.json();
   return Array.isArray(data.sessions) ? (data.sessions as DbSession[]) : [];
+};
+
+// Fetch the full message thread for one of the user's sessions (ownership-scoped
+// server-side; returns [] if the session isn't found / not owned / unauthorized).
+export const getSessionMessagesApi = async (
+  sessionId: string,
+): Promise<ConversationMessage[]> => {
+  const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/messages`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) removeToken();
+    return [];
+  }
+  const data = await response.json();
+  return Array.isArray(data.messages)
+    ? (data.messages as ConversationMessage[])
+    : [];
 };
 
 export interface ClinicsPage {

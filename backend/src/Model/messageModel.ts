@@ -21,3 +21,18 @@ export const getMessagesBySession = async (sessionId: string) => {
     orderBy: { createdAt: "asc" },
   });
 };
+
+// Messages for a session, but only if the session belongs to the user.
+// Returns null when the session doesn't exist or isn't owned by the user
+// (caller turns that into a 404 — keeps therapy transcripts private).
+export const getMessagesForUserSession = async (
+  sessionId: string,
+  userId: string
+) => {
+  const owned = await prisma.session.findFirst({
+    where: { id: sessionId, userId },
+    select: { id: true },
+  });
+  if (!owned) return null;
+  return getMessagesBySession(sessionId);
+};

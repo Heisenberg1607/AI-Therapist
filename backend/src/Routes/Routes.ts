@@ -9,6 +9,7 @@ import {
   completeOnboarding,
   saveSessionSummary,
   getSessions,
+  getSessionMessages,
   getClinics,
 } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
@@ -74,6 +75,15 @@ router.get("/sessions", authenticate, async (req, res, next) => {
 router.post("/sessions/:sessionId/summary", authenticate, async (req, res, next) => {
   try {
     await saveSessionSummary(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Full message thread for one of the user's sessions
+router.get("/sessions/:sessionId/messages", authenticate, async (req, res, next) => {
+  try {
+    await getSessionMessages(req, res);
   } catch (error) {
     next(error);
   }
