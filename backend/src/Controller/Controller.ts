@@ -10,6 +10,7 @@ import {
   updateSessionSummary,
   getSessionsByUser,
 } from "../Model/sessionModel";
+import { getNearbyClinics } from "../Model/clinicModel";
 import { AuthRequest } from "../middleware/authMiddleware";
 import {
   createUser,
@@ -179,6 +180,54 @@ export const getSessions = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("getSessions error", error);
     res.status(500).json({ message: "Failed to fetch sessions" });
+  }
+};
+
+// Clinics returned per page (server-side pagination).
+const CLINIC_PAGE_SIZE = 7;
+
+// List nearby behavioral-health clinics, paginated. Public (gov-sourced data).
+// Query params: lat, lng (optional pair) → distance-ranked; q → name/specialty
+// search; specialty → specialty-tag filter; sort = distance|name;
+// radius (meters, default 40000); page (1-based, default 1).
+export const getClinics = async (req: Request, res: Response) => {
+  try {
+    const num = (v: unknown) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const lat = num(req.query.lat);
+    const lng = num(req.query.lng);
+    const q = typeof req.query.q === "string" ? req.query.q : undefined;
+    const specialty =
+      typeof req.query.specialty === "string" ? req.query.specialty : undefined;
+    const sort = req.query.sort === "name" ? "name" : "distance";
+    const radiusM = num(req.query.radius);
+    const page = Math.max(num(req.query.page) ?? 1, 1);
+
+    // lat/lng must come as a pair, or not at all.
+    if ((lat == null) !== (lng == null)) {
+      return res
+        .status(400)
+        .json({ message: "Provide both lat and lng, or neither." });
+    }
+
+    const { clinics, total } = await getNearbyClinics({
+      lat,
+      lng,
+      q,
+      specialty,
+      sort,
+      radiusM,
+      page,
+      pageSize: CLINIC_PAGE_SIZE,
+    });
+
+    res.status(200).json({ clinics, total, page, pageSize: CLINIC_PAGE_SIZE });
+  } catch (error) {
+    console.error("getClinics error", error);
+    res.status(500).json({ message: "Failed to fetch clinics" });
   }
 };
 

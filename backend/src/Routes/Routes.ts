@@ -9,6 +9,7 @@ import {
   completeOnboarding,
   saveSessionSummary,
   getSessions,
+  getClinics,
 } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
 
@@ -21,6 +22,15 @@ router.post("/register", register);
 // Health check route
 router.get("/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+// Nearby clinics (public — gov-sourced behavioral-health directory)
+router.get("/clinics", async (req, res, next) => {
+  try {
+    await getClinics(req, res);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Protected routes (require authentication)
