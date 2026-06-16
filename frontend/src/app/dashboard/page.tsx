@@ -1,4 +1,7 @@
 "use client";
+
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -6,356 +9,392 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  Calendar,
-  Clock,
-  TrendingUp,
-  Users,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  CartesianGrid,
+  Tooltip,
+} from "recharts";
+import {
   MessageSquare,
-  Heart,
+  Clock,
+  Flame,
   Activity,
-  BarChart3,
-  User,
+  Sparkles,
+  ArrowRight,
+  Loader2,
+  Heart,
+  Hash,
+  CalendarDays,
 } from "lucide-react";
 import { ProtectedRoute } from "../Components/ProtectedRoute";
+import {
+  getAnalyticsApi,
+  getSessionsApi,
+  type UserAnalytics,
+  type DbSession,
+} from "../lib/api";
+import { moodToScore } from "@/lib/sessionStorage";
 
-export default function OverviewPage() {
-  const stats = {
-    totalSessions: 127,
-    activeClients: 23,
-    avgSessionLength: 42,
-    completionRate: 89,
-  };
+const cardClass = "bg-gray-900 border-gray-800";
+const GREEN = "#22c55e";
 
-  const recentSessions = [
-    {
-      id: 1,
-      client: "Atharva K.",
-      initials: "AK",
-      date: "Today, 2:30 PM",
-      duration: 45,
-      mood: "Positive",
-      status: "completed",
-    },
-    {
-      id: 2,
-      client: "Sarah M.",
-      initials: "SM",
-      date: "Today, 11:00 AM",
-      duration: 38,
-      mood: "Neutral",
-      status: "completed",
-    },
-    {
-      id: 3,
-      client: "John D.",
-      initials: "JD",
-      date: "Yesterday, 4:15 PM",
-      duration: 52,
-      mood: "Improving",
-      status: "completed",
-    },
-    {
-      id: 4,
-      client: "Emma L.",
-      initials: "EL",
-      date: "Yesterday, 1:00 PM",
-      duration: 41,
-      mood: "Challenging",
-      status: "needs-followup",
-    },
-  ];
+function formatTotalTime(seconds: number): string {
+  const totalMin = Math.round(seconds / 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return h === 0 ? `${m}m` : `${h}h ${m}m`;
+}
 
-  const upcomingSessions = [
-    {
-      id: 1,
-      client: "Michael R.",
-      initials: "MR",
-      time: "3:00 PM",
-      type: "Initial Consultation",
-    },
-    {
-      id: 2,
-      client: "Lisa K.",
-      initials: "LK",
-      time: "4:30 PM",
-      type: "Follow-up Session",
-    },
-  ];
+function formatMinutes(seconds: number): string {
+  return `${Math.round(seconds / 60)}m`;
+}
 
+function shortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function initialsFromDate(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()}`.padStart(2, "0");
+}
+
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon,
+}: {
+  title: string;
+  value: string;
+  subtitle?: string;
+  icon: ReactNode;
+}) {
   return (
-    <ProtectedRoute>
+    <Card className={cardClass}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-gray-400">
+          {title}
+        </CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold text-white">{value}</div>
+        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+function OverviewView() {
+  const [analytics, setAnalytics] = useState<UserAnalytics | null>(null);
+  const [sessions, setSessions] = useState<DbSession[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const [a, s] = await Promise.all([
+        getAnalyticsApi("all"),
+        getSessionsApi(),
+      ]);
+      if (cancelled) return;
+      setAnalytics(a);
+      setSessions(s);
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const moodData = useMemo(
+    () =>
+      (analytics?.moodTimeline ?? []).map((m) => ({
+        label: shortDate(m.date),
+        score: moodToScore(m.mood),
+      })),
+    [analytics],
+  );
+
+  const recent = useMemo(() => (sessions ?? []).slice(0, 5), [sessions]);
+
+  if (loading) {
+    return (
+      <div className="p-8 mt-10 flex items-center justify-center text-gray-500 text-sm h-[60vh]">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        Loading your dashboard…
+      </div>
+    );
+  }
+
+  const a = analytics;
+  const empty = !a || a.totalSessions === 0;
+
+  if (empty) {
+    return (
       <div className="p-8 mt-10">
-      
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className=" border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Total Sessions
-            </CardTitle>
-            <MessageSquare className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.totalSessions}
-            </div>
-            <p className="text-xs text-green-500">+12% from last month</p>
-          </CardContent>
-        </Card>
-
-        <Card className=" border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Active Clients
-            </CardTitle>
-            <Users className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.activeClients}
-            </div>
-            <p className="text-xs text-green-500">+3 new this week</p>
-          </CardContent>
-        </Card>
-
-        <Card className=" border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Avg Session Length
-            </CardTitle>
-            <Clock className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.avgSessionLength}m
-            </div>
-            <p className="text-xs text-gray-400">Optimal range</p>
-          </CardContent>
-        </Card>
-
-        <Card className=" border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Completion Rate
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {stats.completionRate}%
-            </div>
-            <p className="text-xs text-green-500">Above average</p>
+        <Card className={cardClass}>
+          <CardContent className="py-16 text-center">
+            <Sparkles className="h-10 w-10 text-green-500 mx-auto mb-4" />
+            <p className="text-white font-medium">Welcome 👋</p>
+            <p className="text-sm text-gray-500 mt-1 mb-6">
+              You haven&apos;t had any sessions yet. Start one and your dashboard
+              will fill up.
+            </p>
+            <Link
+              href="/chat"
+              className="inline-flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-6 py-2.5 rounded-lg text-sm"
+            >
+              Start a session <ArrowRight className="h-4 w-4" />
+            </Link>
           </CardContent>
         </Card>
       </div>
+    );
+  }
 
-      {/* Main Content */}
+  const topMood = a.moodDistribution[0]?.mood ?? "—";
+  const topTopic = a.topicDistribution[0]?.topic ?? "—";
+
+  return (
+    <div className="p-8 mt-10">
+      {/* Stat cards (real, user-specific) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <StatCard
+          title="Total Sessions"
+          value={`${a.totalSessions}`}
+          subtitle={
+            a.daysSinceLast != null ? `Last one ${a.daysSinceLast}d ago` : undefined
+          }
+          icon={<MessageSquare className="h-4 w-4 text-green-500" />}
+        />
+        <StatCard
+          title="This Week"
+          value={`${a.sessionsThisWeek}`}
+          subtitle={
+            a.currentStreakDays > 0 ? `${a.currentStreakDays}-day streak` : "sessions"
+          }
+          icon={<Flame className="h-4 w-4 text-green-500" />}
+        />
+        <StatCard
+          title="Avg Session Length"
+          value={formatMinutes(a.avgDurationSec)}
+          icon={<Clock className="h-4 w-4 text-green-500" />}
+        />
+        <StatCard
+          title="Total Time"
+          value={formatTotalTime(a.totalDurationSec)}
+          subtitle="In sessions"
+          icon={<Activity className="h-4 w-4 text-green-500" />}
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column */}
+        {/* Left: recent sessions + mood trend */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Recent Sessions */}
-          <Card className=" border-gray-800">
+          <Card className={cardClass}>
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Activity className="h-5 w-5 mr-2 text-green-500" />
-                Recent Sessions
-              </CardTitle>
-              <CardDescription className="text-gray-400">
-                Latest therapy sessions and client interactions
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-white flex items-center">
+                    <Activity className="h-5 w-5 mr-2 text-green-500" />
+                    Recent Sessions
+                  </CardTitle>
+                  <CardDescription className="text-gray-400">
+                    Your latest conversations
+                  </CardDescription>
+                </div>
+                <Link
+                  href="/dashboard/conversations"
+                  className="text-sm text-green-500 hover:underline flex items-center"
+                >
+                  View all <ArrowRight className="h-3 w-3 ml-1" />
+                </Link>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-gray-800 border border-gray-700"
+              <div className="space-y-3">
+                {recent.map((s) => (
+                  <Link
+                    key={s.id}
+                    href="/dashboard/conversations"
+                    className="flex items-center justify-between p-4 rounded-lg bg-gray-800 border border-gray-700 hover:border-gray-600 transition-colors"
                   >
-                    <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-4 min-w-0">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className="bg-green-500 text-black font-semibold">
-                          {session.initials}
+                          {initialsFromDate(s.createdAt)}
                         </AvatarFallback>
                       </Avatar>
-                      <div>
-                        <p className="font-medium text-white">
-                          {session.client}
+                      <div className="min-w-0">
+                        <p className="font-medium text-white truncate">
+                          {s.topic || "Session"}
                         </p>
-                        <p className="text-sm text-gray-400">{session.date}</p>
+                        <p className="text-sm text-gray-400">
+                          {shortDate(s.createdAt)}
+                        </p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <p className="text-sm text-white">
-                          {session.duration}min
-                        </p>
-                        <Badge
-                          variant={
-                            session.mood === "Positive"
-                              ? "default"
-                              : session.mood === "Challenging"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                          className={
-                            session.mood === "Positive"
-                              ? "bg-green-500 text-black"
-                              : ""
-                          }
-                        >
-                          {session.mood}
+                    <div className="flex items-center space-x-3 shrink-0">
+                      {s.durationSec != null && (
+                        <span className="text-sm text-gray-400">
+                          {formatMinutes(s.durationSec)}
+                        </span>
+                      )}
+                      {s.mood && (
+                        <Badge className="bg-gray-700 text-gray-200 capitalize">
+                          {s.mood}
                         </Badge>
-                      </div>
-                      {session.status === "needs-followup" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-yellow-500 text-yellow-500 bg-transparent"
-                        >
-                          Follow-up
-                        </Button>
+                      )}
+                      {s.crisisFlag && (
+                        <Badge className="bg-red-500 text-white">Crisis</Badge>
                       )}
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          {/* Analytics Chart Placeholder */}
-          <Card className=" border-gray-800">
+          <Card className={cardClass}>
             <CardHeader>
               <CardTitle className="text-white flex items-center">
-                <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
-                Session Analytics
+                <Heart className="h-5 w-5 mr-2 text-green-500" />
+                Mood trend
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Weekly session trends and client progress
+                Starting mood across your sessions
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-64 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700">
-                <div className="text-center">
-                  <BarChart3 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <p className="text-gray-400">
-                    Analytics chart would be displayed here
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Integration with charting library needed
-                  </p>
-                </div>
-              </div>
+              {moodData.length < 2 ? (
+                <p className="text-sm text-gray-500 py-8 text-center">
+                  Not enough mood data yet to chart a trend.
+                </p>
+              ) : (
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={moodData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "hsl(240, 20%, 8%)",
+                        border: "1px solid rgba(255,255,255,0.12)",
+                        borderRadius: 12,
+                        color: "#fff",
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="score"
+                      stroke={GREEN}
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: GREEN }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right Column */}
+        {/* Right: at a glance + quick action */}
         <div className="space-y-6">
-          {/* Today's Schedule */}
-          <Card className=" border-gray-800">
+          <Card className={cardClass}>
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Calendar className="h-5 w-5 mr-2 text-green-500" />
-                Today Schedule
-              </CardTitle>
+              <CardTitle className="text-white">At a glance</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center space-x-3 p-3 rounded-lg bg-gray-800 border border-gray-700"
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-green-500 text-black text-sm font-semibold">
-                        {session.initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-medium text-white text-sm">
-                        {session.client}
-                      </p>
-                      <p className="text-xs text-gray-400">{session.type}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-green-500 font-medium">
-                        {session.time}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Button className="w-full mt-4 bg-green-500 hover:bg-green-600 text-black">
-                View Full Schedule
-              </Button>
+            <CardContent className="space-y-4">
+              <Glance
+                icon={<Heart className="h-4 w-4 text-green-500" />}
+                label="Most common mood"
+                value={topMood}
+              />
+              <Glance
+                icon={<Hash className="h-4 w-4 text-green-500" />}
+                label="Most common topic"
+                value={topTopic}
+              />
+              <Glance
+                icon={<MessageSquare className="h-4 w-4 text-green-500" />}
+                label="Messages exchanged"
+                value={`${a.messages.total}`}
+              />
+              <Glance
+                icon={<CalendarDays className="h-4 w-4 text-green-500" />}
+                label="Days since last session"
+                value={a.daysSinceLast != null ? `${a.daysSinceLast}` : "—"}
+              />
             </CardContent>
           </Card>
 
-          {/* Client Progress */}
-          <Card className=" border-gray-800">
+          <Card className={cardClass}>
             <CardHeader>
-              <CardTitle className="text-white flex items-center">
-                <Heart className="h-5 w-5 mr-2 text-green-500" />
-                Client Progress
-              </CardTitle>
+              <CardTitle className="text-white">Quick actions</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Overall Improvement</span>
-                    <span className="text-green-500">78%</span>
-                  </div>
-                  <Progress value={78} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Session Engagement</span>
-                    <span className="text-green-500">92%</span>
-                  </div>
-                  <Progress value={92} className="h-2" />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-gray-400">Goal Achievement</span>
-                    <span className="text-green-500">65%</span>
-                  </div>
-                  <Progress value={65} className="h-2" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Quick Actions */}
-          <Card className=" border-gray-800">
-            <CardHeader>
-              <CardTitle className="text-white">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <Button className="w-full bg-green-500 hover:bg-green-600 text-black">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Start Emergency Session
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
-                >
-                  <User className="h-4 w-4 mr-2" />
-                  Add New Client
-                </Button>
-              </div>
+            <CardContent className="space-y-3">
+              <Link
+                href="/chat"
+                className="w-full inline-flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-black font-semibold px-4 py-2.5 rounded-lg text-sm"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Start a session
+              </Link>
+              <Link
+                href="/dashboard/analytics"
+                className="w-full inline-flex items-center justify-center gap-2 border border-gray-600 text-gray-300 hover:bg-gray-800 px-4 py-2.5 rounded-lg text-sm"
+              >
+                <Activity className="h-4 w-4" />
+                View analytics
+              </Link>
             </CardContent>
           </Card>
         </div>
       </div>
     </div>
+  );
+}
+
+function Glance({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="flex items-center gap-2 text-sm text-gray-400">
+        {icon}
+        {label}
+      </span>
+      <span className="text-sm text-white font-medium capitalize">{value}</span>
+    </div>
+  );
+}
+
+export default function OverviewPage() {
+  return (
+    <ProtectedRoute>
+      <OverviewView />
     </ProtectedRoute>
   );
 }
