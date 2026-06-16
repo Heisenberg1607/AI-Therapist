@@ -15,6 +15,17 @@ function cutoffFor(range: AnalyticsRange): Date | null {
   return d;
 }
 
+function pacificHour(d: Date): number {
+  const hour = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      hour: "numeric",
+      hour12: false,
+    }).format(d),
+  );
+  return hour === 24 ? 0 : hour;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 const dayKey = (d: Date) => d.toISOString().slice(0, 10); // YYYY-MM-DD (UTC)
 
@@ -137,7 +148,7 @@ export const getUserAnalytics = async (
     const k = dayKey(s.createdAt);
     dayKeys.add(k);
     byDay.set(k, (byDay.get(k) ?? 0) + 1);
-    const h = s.createdAt.getUTCHours();
+    const h = pacificHour(s.createdAt);
     byHour.set(h, (byHour.get(h) ?? 0) + 1);
   }
 

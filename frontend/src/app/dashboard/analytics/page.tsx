@@ -52,13 +52,13 @@ import { moodToScore, SCORE_LABELS } from "@/lib/sessionStorage";
 
 const GREEN = "#22c55e";
 
-function formatTotalTime(seconds: number): string {
-  const totalMin = Math.round(seconds / 60);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  if (h === 0) return `${m}m`;
-  return `${h}h ${m}m`;
-}
+// function formatTotalTime(seconds: number): string {
+//   const totalMin = Math.round(seconds / 60);
+//   const h = Math.floor(totalMin / 60);
+//   const m = totalMin % 60;
+//   if (h === 0) return `${m}m`;
+//   return `${h}h ${m}m`;
+// }
 
 function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)}m`;
@@ -210,7 +210,10 @@ function AnalyticsView() {
           <BarChart3 className="h-6 w-6 mr-2 text-green-500" />
           Analytics
         </h1>
-        <Select value={range} onValueChange={(v) => setRange(v as AnalyticsRange)}>
+        <Select
+          value={range}
+          onValueChange={(v) => setRange(v as AnalyticsRange)}
+        >
           <SelectTrigger className="w-32 bg-gray-900 border-gray-700 text-white">
             <SelectValue />
           </SelectTrigger>
@@ -227,7 +230,9 @@ function AnalyticsView() {
         <Card className={cardClass}>
           <CardContent className="py-16 text-center">
             <Activity className="h-10 w-10 text-green-500 mx-auto mb-4" />
-            <p className="text-white font-medium">No sessions in this range yet</p>
+            <p className="text-white font-medium">
+              No sessions in this range yet
+            </p>
             <p className="text-sm text-gray-500 mt-1">
               Finish a conversation and your analytics will appear here.
             </p>
@@ -298,8 +303,15 @@ function AnalyticsView() {
                     ) : (
                       <ResponsiveContainer width="100%" height={256}>
                         <LineChart data={moodData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
-                          <XAxis dataKey="label" tick={axisTick} tickLine={false} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke={chartGrid}
+                          />
+                          <XAxis
+                            dataKey="label"
+                            tick={axisTick}
+                            tickLine={false}
+                          />
                           <YAxis
                             domain={[1, 6]}
                             ticks={[1, 2, 3, 4, 5, 6]}
@@ -349,7 +361,9 @@ function AnalyticsView() {
 
                 <Card className={cardClass}>
                   <CardHeader>
-                    <CardTitle className="text-white">Sessions over time</CardTitle>
+                    <CardTitle className="text-white">
+                      Sessions over time
+                    </CardTitle>
                     <CardDescription className="text-gray-400">
                       When you showed up
                     </CardDescription>
@@ -357,16 +371,30 @@ function AnalyticsView() {
                   <CardContent>
                     <ResponsiveContainer width="100%" height={256}>
                       <BarChart data={sessionsData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
-                        <XAxis dataKey="label" tick={axisTick} tickLine={false} />
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke={chartGrid}
+                        />
+                        <XAxis
+                          dataKey="label"
+                          tick={axisTick}
+                          tickLine={false}
+                        />
                         <YAxis
                           allowDecimals={false}
                           tick={axisTick}
                           tickLine={false}
                           width={28}
                         />
-                        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-                        <Bar dataKey="count" fill={GREEN} radius={[4, 4, 0, 0]} />
+                        <Tooltip
+                          contentStyle={tooltipStyle}
+                          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          fill={GREEN}
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
@@ -386,12 +414,16 @@ function AnalyticsView() {
                 <MetricCard
                   title="Crisis Flags"
                   value={`${data.crisisCount}`}
-                  subtitle={data.crisisCount === 0 ? "None — good" : "Sessions flagged"}
+                  subtitle={
+                    data.crisisCount === 0 ? "None — good" : "Sessions flagged"
+                  }
                   icon={<AlertTriangle className="h-4 w-4 text-green-500" />}
                 />
                 <MetricCard
                   title="Days Since Last"
-                  value={data.daysSinceLast != null ? `${data.daysSinceLast}` : "—"}
+                  value={
+                    data.daysSinceLast != null ? `${data.daysSinceLast}` : "—"
+                  }
                   subtitle="Since your last session"
                   icon={<CalendarDays className="h-4 w-4 text-green-500" />}
                 />
@@ -400,7 +432,9 @@ function AnalyticsView() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card className={cardClass}>
                   <CardHeader>
-                    <CardTitle className="text-white">You vs Therapist</CardTitle>
+                    <CardTitle className="text-white">
+                      You vs Therapist
+                    </CardTitle>
                     <CardDescription className="text-gray-400">
                       Share of messages
                     </CardDescription>
@@ -408,7 +442,9 @@ function AnalyticsView() {
                   <CardContent className="space-y-4 pt-2">
                     {(() => {
                       const total = data.messages.total || 1;
-                      const userPct = Math.round((data.messages.user / total) * 100);
+                      const userPct = Math.round(
+                        (data.messages.user / total) * 100,
+                      );
                       return (
                         <>
                           <div>
@@ -439,7 +475,7 @@ function AnalyticsView() {
                   <CardHeader>
                     <CardTitle className="text-white">Time of day</CardTitle>
                     <CardDescription className="text-gray-400">
-                      When you usually have sessions (UTC)
+                      When you usually have sessions (Pacific Time)
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -450,11 +486,30 @@ function AnalyticsView() {
                     ) : (
                       <ResponsiveContainer width="100%" height={220}>
                         <BarChart data={hourData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} />
-                          <XAxis dataKey="label" tick={axisTick} tickLine={false} />
-                          <YAxis allowDecimals={false} tick={axisTick} tickLine={false} width={28} />
-                          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-                          <Bar dataKey="count" fill={GREEN} radius={[4, 4, 0, 0]} />
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke={chartGrid}
+                          />
+                          <XAxis
+                            dataKey="label"
+                            tick={axisTick}
+                            tickLine={false}
+                          />
+                          <YAxis
+                            allowDecimals={false}
+                            tick={axisTick}
+                            tickLine={false}
+                            width={28}
+                          />
+                          <Tooltip
+                            contentStyle={tooltipStyle}
+                            cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                          />
+                          <Bar
+                            dataKey="count"
+                            fill={GREEN}
+                            radius={[4, 4, 0, 0]}
+                          />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -464,7 +519,9 @@ function AnalyticsView() {
 
               <Card className={cardClass}>
                 <CardHeader>
-                  <CardTitle className="text-white">What you talk about</CardTitle>
+                  <CardTitle className="text-white">
+                    What you talk about
+                  </CardTitle>
                   <CardDescription className="text-gray-400">
                     Most common topics
                   </CardDescription>
@@ -475,10 +532,26 @@ function AnalyticsView() {
                       No topics recorded yet.
                     </p>
                   ) : (
-                    <ResponsiveContainer width="100%" height={Math.max(160, topicData.length * 44)}>
-                      <BarChart data={topicData} layout="vertical" margin={{ left: 16, right: 16 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} horizontal={false} />
-                        <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} />
+                    <ResponsiveContainer
+                      width="100%"
+                      height={Math.max(160, topicData.length * 44)}
+                    >
+                      <BarChart
+                        data={topicData}
+                        layout="vertical"
+                        margin={{ left: 16, right: 16 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          stroke={chartGrid}
+                          horizontal={false}
+                        />
+                        <XAxis
+                          type="number"
+                          allowDecimals={false}
+                          tick={axisTick}
+                          tickLine={false}
+                        />
                         <YAxis
                           type="category"
                           dataKey="topic"
@@ -486,8 +559,15 @@ function AnalyticsView() {
                           tick={axisTick}
                           tickLine={false}
                         />
-                        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-                        <Bar dataKey="count" fill={GREEN} radius={[0, 4, 4, 0]} />
+                        <Tooltip
+                          contentStyle={tooltipStyle}
+                          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                        />
+                        <Bar
+                          dataKey="count"
+                          fill={GREEN}
+                          radius={[0, 4, 4, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   )}

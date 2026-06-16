@@ -11,8 +11,7 @@ import {
   MessageSquare,
   MapPin,
   BarChart3,
-  Settings,
-  
+  // Settings,
 } from "lucide-react";
 
 const navigation = [
@@ -25,7 +24,7 @@ const navigation = [
   },
   { name: "Nearby Clinics", href: "/dashboard/clinics", icon: MapPin },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  // { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 export default function DashboardLayout({
