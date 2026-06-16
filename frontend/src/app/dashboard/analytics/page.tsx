@@ -30,10 +30,8 @@ import {
 } from "recharts";
 import {
   BarChart3,
-  Clock,
   MessageSquare,
   CalendarDays,
-  Flame,
   AlertTriangle,
   TrendingUp,
   TrendingDown,
@@ -237,41 +235,6 @@ function AnalyticsView() {
         </Card>
       ) : (
         <>
-          {/* Metric cards (real, user-specific) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <MetricCard
-              title="Total Sessions"
-              value={`${data.totalSessions}`}
-              subtitle={
-                data.daysSinceLast != null
-                  ? `Last session ${data.daysSinceLast}d ago`
-                  : undefined
-              }
-              icon={<MessageSquare className="h-4 w-4 text-green-500" />}
-            />
-            <MetricCard
-              title="Total Time"
-              value={formatTotalTime(data.totalDurationSec)}
-              subtitle="Time spent in sessions"
-              icon={<Clock className="h-4 w-4 text-green-500" />}
-            />
-            <MetricCard
-              title="Avg Session Length"
-              value={formatMinutes(data.avgDurationSec)}
-              icon={<BarChart3 className="h-4 w-4 text-green-500" />}
-            />
-            <MetricCard
-              title="This Week"
-              value={`${data.sessionsThisWeek}`}
-              subtitle={
-                data.currentStreakDays > 0
-                  ? `${data.currentStreakDays}-day streak`
-                  : "sessions"
-              }
-              icon={<Flame className="h-4 w-4 text-green-500" />}
-            />
-          </div>
-
           <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="bg-gray-900 border border-gray-800">
               {["overview", "engagement", "insights"].map((t) => (

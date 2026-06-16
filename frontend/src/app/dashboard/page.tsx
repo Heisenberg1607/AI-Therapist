@@ -21,8 +21,6 @@ import {
 } from "recharts";
 import {
   MessageSquare,
-  Clock,
-  Flame,
   Activity,
   Sparkles,
   ArrowRight,
@@ -43,13 +41,6 @@ import { moodToScore } from "@/lib/sessionStorage";
 const cardClass = "bg-gray-900 border-gray-800";
 const GREEN = "#22c55e";
 
-function formatTotalTime(seconds: number): string {
-  const totalMin = Math.round(seconds / 60);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return h === 0 ? `${m}m` : `${h}h ${m}m`;
-}
-
 function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)}m`;
 }
@@ -68,33 +59,6 @@ function shortDate(iso: string): string {
 function initialsFromDate(iso: string): string {
   const d = new Date(iso);
   return `${d.getDate()}`.padStart(2, "0");
-}
-
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon,
-}: {
-  title: string;
-  value: string;
-  subtitle?: string;
-  icon: ReactNode;
-}) {
-  return (
-    <Card className={cardClass}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-gray-400">
-          {title}
-        </CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold text-white">{value}</div>
-        {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
-      </CardContent>
-    </Card>
-  );
 }
 
 function OverviewView() {
@@ -170,37 +134,6 @@ function OverviewView() {
 
   return (
     <div className="p-8 mt-10">
-      {/* Stat cards (real, user-specific) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Total Sessions"
-          value={`${a.totalSessions}`}
-          subtitle={
-            a.daysSinceLast != null ? `Last one ${a.daysSinceLast}d ago` : undefined
-          }
-          icon={<MessageSquare className="h-4 w-4 text-green-500" />}
-        />
-        <StatCard
-          title="This Week"
-          value={`${a.sessionsThisWeek}`}
-          subtitle={
-            a.currentStreakDays > 0 ? `${a.currentStreakDays}-day streak` : "sessions"
-          }
-          icon={<Flame className="h-4 w-4 text-green-500" />}
-        />
-        <StatCard
-          title="Avg Session Length"
-          value={formatMinutes(a.avgDurationSec)}
-          icon={<Clock className="h-4 w-4 text-green-500" />}
-        />
-        <StatCard
-          title="Total Time"
-          value={formatTotalTime(a.totalDurationSec)}
-          subtitle="In sessions"
-          icon={<Activity className="h-4 w-4 text-green-500" />}
-        />
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left: recent sessions + mood trend */}
         <div className="lg:col-span-2 space-y-6">
