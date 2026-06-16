@@ -1,4 +1,4 @@
-import { getAuthHeaders, removeToken } from "./auth";
+import { getAuthHeaders, getToken, removeToken } from "./auth";
 import type { OnboardingAnswers } from "@/lib/buildSystemPrompt";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -312,6 +312,112 @@ export const getClinicsApi = async (params: {
     page: typeof data.page === "number" ? data.page : empty.page,
     pageSize: typeof data.pageSize === "number" ? data.pageSize : 7,
   };
+};
+
+export type ReportType = "GENERATED" | "UPLOADED";
+
+export interface Report {
+  id: string;
+  userId: string;
+  type: ReportType;
+  title: string;
+  summary: string | null;
+  mostCommonIssues: string[];
+  filePath: string;
+  fileType: string;
+  createdAt: string;
+  url: string | null;
+}
+
+export interface RatingMetricScore {
+  metric: string;
+  score: number;
+}
+
+export interface RatingsSummary {
+  count: number;
+  overall: number;
+  metrics: RatingMetricScore[];
+}
+
+export const listReportsApi = async (): Promise<Report[]> => {
+  const response = await fetch(`${API_BASE_URL}/reports`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) removeToken();
+    return [];
+  }
+  const data = await response.json();
+  return Array.isArray(data.reports) ? (data.reports as Report[]) : [];
+};
+
+export const generateReportApi = async (): Promise<Report> => {
+  const response = await fetch(`${API_BASE_URL}/reports/generate`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      removeToken();
+      throw new Error("Session expired. Please login again.");
+    }
+    const error = await response.json();
+    throw new Error(error.message || "Failed to generate report");
+  }
+  const data = await response.json();
+  return data.report as Report;
+};
+
+export const uploadReportApi = async (file: File): Promise<Report> => {
+  const form = new FormData();
+  form.append("file", file);
+  const headers = getAuthHeaders();
+  delete (headers as Record<string, string>)["Content-Type"];
+
+  const response = await fetch(`${API_BASE_URL}/reports/upload`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      removeToken();
+      throw new Error("Session expired. Please login again.");
+    }
+    const error = await response.json();
+    throw new Error(error.message || "Failed to upload report");
+  }
+  const data = await response.json();
+  return data.report as Report;
+};
+
+export const getRatingsSummaryApi = async (): Promise<RatingsSummary | null> => {
+  const response = await fetch(`${API_BASE_URL}/reports/ratings`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) removeToken();
+    return null;
+  }
+  const data = await response.json();
+  return (data.ratings as RatingsSummary) ?? null;
+};
+
+export const backfillRatingsApi = async (): Promise<{ graded: number }> => {
+  const response = await fetch(`${API_BASE_URL}/reports/ratings/backfill`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      removeToken();
+      throw new Error("Session expired. Please login again.");
+    }
+    const error = await response.json();
+    throw new Error(error.message || "Failed to score sessions");
+  }
+  return response.json();
 };
 
 // export const getWelcomeMessage = async (): Promise<{

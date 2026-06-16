@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Card,
   CardContent,
@@ -12,316 +12,477 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   FileText,
   Download,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Clock,
-  Calendar,
-  BarChart3,
-  PieChart,
+  Upload,
+  Sparkles,
+  Star,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
   Activity,
-  Target,
+  AlertCircle,
 } from "lucide-react";
+import { ProtectedRoute } from "../../Components/ProtectedRoute";
+import {
+  listReportsApi,
+  generateReportApi,
+  uploadReportApi,
+  getRatingsSummaryApi,
+  backfillRatingsApi,
+  type Report,
+  type RatingsSummary,
+} from "../../lib/api";
+import { cn } from "@/lib/utils";
 
-export default function ReportsPage() {
-  const [timeRange, setTimeRange] = useState("month");
+const cardClass = "bg-gray-900 border-gray-800";
 
-  const reportStats = {
-    totalSessions: 127,
-    completedSessions: 114,
-    cancelledSessions: 13,
-    avgSessionRating: 4.7,
-    clientRetention: 89,
-    responseTime: 2.3,
+const METRIC_LABELS: Record<string, string> = {
+  empathy: "Empathy",
+  conciseness: "Conciseness",
+  task_completion: "Task Completion",
+  safety_guardrail: "Safety & Guardrails",
+  active_listening: "Active Listening",
+};
+
+const METRIC_DESCRIPTIONS: Record<string, string> = {
+  empathy: "Warmth, validation, and emotional attunement",
+  conciseness: "Appropriately brief responses without rambling",
+  task_completion: "Helped explore or make progress on the client's concern",
+  safety_guardrail: "Handled risk appropriately; avoided harmful advice",
+  active_listening: "Reflected feelings and tracked what the client said",
+};
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function scoreColor(score: number): string {
+  if (score >= 4) return "text-green-500";
+  if (score >= 3) return "text-yellow-500";
+  return "text-red-400";
+}
+
+function ReportsView() {
+  const [reports, setReports] = useState<Report[] | null>(null);
+  const [ratings, setRatings] = useState<RatingsSummary | null | undefined>(
+    undefined,
+  );
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ratingExpanded, setRatingExpanded] = useState(false);
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadData = useCallback(async () => {
+    const [r, rt] = await Promise.all([listReportsApi(), getRatingsSummaryApi()]);
+    setReports(r);
+    setRatings(rt);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleGenerate = async () => {
+    setError(null);
+    setGenerating(true);
+    try {
+      const report = await generateReportApi();
+      setReports((prev) => [report, ...(prev ?? [])]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to generate report");
+    } finally {
+      setGenerating(false);
+    }
   };
 
+  const handleUpload = async (file: File) => {
+    setError(null);
+    setUploading(true);
+    try {
+      const report = await uploadReportApi(file);
+      setReports((prev) => [report, ...(prev ?? [])]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to upload report");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
+  const handleScoreSessions = async () => {
+    setError(null);
+    setScoring(true);
+    try {
+      await backfillRatingsApi();
+      const updated = await getRatingsSummaryApi();
+      setRatings(updated);
+      setRatingExpanded(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to score sessions");
+    } finally {
+      setScoring(false);
+    }
+  };
 
-  const topIssues = [
-    { issue: "Work Anxiety", sessions: 34, percentage: 27 },
-    { issue: "Relationship Issues", sessions: 28, percentage: 22 },
-    { issue: "Sleep Disorders", sessions: 25, percentage: 20 },
-    { issue: "Depression", sessions: 19, percentage: 15 },
-    { issue: "Stress Management", sessions: 16, percentage: 13 },
-    { issue: "Other", sessions: 5, percentage: 4 },
-  ];
+  if (loading) {
+    return (
+      <div className="p-8 mt-10 flex items-center justify-center text-gray-500 text-sm h-[60vh]">
+        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        Loading reports…
+      </div>
+    );
+  }
 
-  const clientProgress = [
-    { name: "Sarah M.", improvement: 85, sessions: 12, status: "Excellent" },
-    { name: "John D.", improvement: 72, sessions: 8, status: "Good" },
-    { name: "Emma L.", improvement: 45, sessions: 15, status: "Moderate" },
-    { name: "Michael R.", improvement: 91, sessions: 6, status: "Excellent" },
-    { name: "Lisa K.", improvement: 68, sessions: 10, status: "Good" },
-  ];
+  const hasRatings = ratings != null;
 
   return (
-    <div className="p-8 mt-10">
-      <div className="flex items-center justify-between mb-8">
-        
-        <div className="flex items-center space-x-4">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-40 bg-gray-900 border-gray-700 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-gray-900 border-gray-700">
-              <SelectItem value="week">Last Week</SelectItem>
-              <SelectItem value="month">Last Month</SelectItem>
-              <SelectItem value="quarter">Last Quarter</SelectItem>
-              <SelectItem value="year">Last Year</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button className="bg-green-500 hover:bg-green-600 text-black">
-            <Download className="h-4 w-4 mr-2" />
-            Export Report
+    <div className="p-8 mt-10 max-w-5xl">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">Reports</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Generate clinical summaries or upload your own documents
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUpload(file);
+            }}
+          />
+          <Button
+            variant="outline"
+            className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
+            disabled={uploading || generating}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4 mr-2" />
+            )}
+            Upload Report
+          </Button>
+          <Button
+            className="bg-green-500 hover:bg-green-600 text-black"
+            disabled={generating || uploading}
+            onClick={handleGenerate}
+          >
+            {generating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Generate Report
           </Button>
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Session Completion Rate
-            </CardTitle>
-            <Target className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {Math.round(
-                (reportStats.completedSessions / reportStats.totalSessions) *
-                  100
-              )}
-              %
-            </div>
-            <p className="text-xs text-green-500 flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              +5% from last month
-            </p>
-          </CardContent>
-        </Card>
+      {error && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          {error}
+        </div>
+      )}
 
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Average Session Rating
-            </CardTitle>
-            <Activity className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {reportStats.avgSessionRating}/5.0
-            </div>
-            <p className="text-xs text-green-500 flex items-center">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              +0.2 from last month
-            </p>
-          </CardContent>
-        </Card>
+      {generating && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          Generating your report from recent sessions — this may take a minute…
+        </div>
+      )}
 
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-400">
-              Client Retention
-            </CardTitle>
-            <Users className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {reportStats.clientRetention}%
-            </div>
-            <p className="text-xs text-red-400 flex items-center">
-              <TrendingDown className="h-3 w-3 mr-1" />
-              -2% from last month
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        {/* Session Trends */}
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center">
-              <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
-              Session Trends
-            </CardTitle>
-            <CardDescription className="text-gray-400">
-              Monthly session volume and satisfaction
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-64 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700 mb-4">
-              <div className="text-center">
-                <BarChart3 className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                <p className="text-gray-400">Session trends chart</p>
-                <p className="text-sm text-gray-500">
-                  Chart visualization would be here
-                </p>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-center">
+      {/* Session Quality Rating */}
+      <Card className={cn(cardClass, "mb-8")}>
+        <CardHeader
+          className="cursor-pointer select-none"
+          onClick={() => hasRatings && setRatingExpanded((v) => !v)}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-2xl font-bold text-green-500">67</p>
-                <p className="text-xs text-gray-400">This Month</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-white">4.9</p>
-                <p className="text-xs text-gray-400">Avg Rating</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-blue-400">+15%</p>
-                <p className="text-xs text-gray-400">Growth</p>
+                <CardTitle className="text-white">Session Quality Rating</CardTitle>
+                <CardDescription className="text-gray-400">
+                  AI therapist performance across your graded sessions
+                </CardDescription>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Top Issues */}
-        <Card className="bg-gray-900 border-gray-800">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center">
-              <PieChart className="h-5 w-5 mr-2 text-green-500" />
-              Most Common Issues
-            </CardTitle>
-            <CardDescription className="text-gray-400">
-              Distribution of therapy topics
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {topIssues.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
-                    <span className="text-white text-sm">{item.issue}</span>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-24">
-                      <Progress value={item.percentage} className="h-2" />
+            <div className="flex items-center gap-3">
+              {hasRatings ? (
+                <>
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 justify-end">
+                      <Star className="h-4 w-4 text-green-500 fill-green-500" />
+                      <span className="text-2xl font-bold text-white">
+                        {ratings.overall}
+                      </span>
+                      <span className="text-gray-400 text-sm">/5</span>
                     </div>
-                    <span className="text-gray-400 text-sm w-12">
-                      {item.sessions}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Client Progress Report */}
-      <Card className="bg-gray-900 border-gray-800 mb-8">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center">
-            <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
-            Client Progress Report
-          </CardTitle>
-          <CardDescription className="text-gray-400">
-            Individual client improvement tracking
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {clientProgress.map((client, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 rounded-lg bg-gray-800 border border-gray-700"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-black font-semibold">
-                    {client.name
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")}
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">{client.name}</p>
-                    <p className="text-sm text-gray-400">
-                      {client.sessions} sessions completed
+                    <p className="text-xs text-gray-500">
+                      {ratings.count} session{ratings.count !== 1 ? "s" : ""} scored
                     </p>
                   </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="w-32">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-400">Progress</span>
-                      <span className="text-green-500">
-                        {client.improvement}%
-                      </span>
-                    </div>
-                    <Progress value={client.improvement} className="h-2" />
-                  </div>
-                  <Badge
-                    variant={
-                      client.status === "Excellent"
-                        ? "default"
-                        : client.status === "Good"
-                        ? "secondary"
-                        : "outline"
-                    }
-                    className={
-                      client.status === "Excellent"
-                        ? "bg-green-500 text-black"
-                        : ""
-                    }
-                  >
-                    {client.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+                  {ratingExpanded ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                  )}
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  className="bg-green-500 hover:bg-green-600 text-black"
+                  disabled={scoring}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleScoreSessions();
+                  }}
+                >
+                  {scoring ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Star className="h-4 w-4 mr-2" />
+                  )}
+                  Score Sessions
+                </Button>
+              )}
+            </div>
           </div>
-        </CardContent>
+        </CardHeader>
+
+        {hasRatings && ratingExpanded && (
+          <CardContent className="pt-0">
+            <div className="space-y-4 border-t border-gray-800 pt-4">
+              {ratings.metrics.map((m) => (
+                <div key={m.metric}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div>
+                      <span className="text-sm font-medium text-white">
+                        {METRIC_LABELS[m.metric] ?? m.metric}
+                      </span>
+                      <p className="text-xs text-gray-500">
+                        {METRIC_DESCRIPTIONS[m.metric]}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "text-sm font-semibold tabular-nums",
+                        scoreColor(m.score),
+                      )}
+                    >
+                      {m.score}/5
+                    </span>
+                  </div>
+                  <Progress value={(m.score / 5) * 100} className="h-2" />
+                </div>
+              ))}
+              <div className="flex justify-end pt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-gray-400 hover:text-white"
+                  disabled={scoring}
+                  onClick={handleScoreSessions}
+                >
+                  {scoring ? (
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  ) : null}
+                  Re-score ungraded sessions
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        )}
+
+        {hasRatings && !ratingExpanded && (
+          <CardContent className="pt-0 pb-4">
+            <p className="text-xs text-gray-500">
+              Tap to expand and see scores for empathy, conciseness, task completion,
+              safety, and active listening
+            </p>
+          </CardContent>
+        )}
+
+        {!hasRatings && !scoring && (
+          <CardContent className="pt-0">
+            <p className="text-sm text-gray-500">
+              No sessions scored yet. Score your past sessions to see how well the AI
+              therapist performed across five quality metrics.
+            </p>
+          </CardContent>
+        )}
+
+        {scoring && !hasRatings && (
+          <CardContent className="pt-0">
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Scoring your sessions — this may take a minute…
+            </div>
+          </CardContent>
+        )}
       </Card>
 
-      {/* Report Actions */}
-      <Card className="bg-gray-900 border-gray-800">
+      {/* Reports List */}
+      <Card className={cardClass}>
         <CardHeader>
           <CardTitle className="text-white flex items-center">
             <FileText className="h-5 w-5 mr-2 text-green-500" />
-            Generate Custom Reports
+            Your Reports
           </CardTitle>
           <CardDescription className="text-gray-400">
-            Create detailed reports for specific needs
+            Generated summaries and uploaded documents
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
-            >
-              <Calendar className="h-4 w-4 mr-2" />
-              Monthly Summary
-            </Button>
-            <Button
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
-            >
-              <Users className="h-4 w-4 mr-2" />
-              Client Progress Report
-            </Button>
-            <Button
-              variant="outline"
-              className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
-            >
-              <Clock className="h-4 w-4 mr-2" />
-              Session Analytics
-            </Button>
-          </div>
+          {!reports || reports.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="h-10 w-10 text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400 text-sm">No reports yet</p>
+              <p className="text-gray-500 text-xs mt-1 max-w-sm mx-auto">
+                Generate a clinical report from your last 3 sessions, or upload a PDF
+                or DOCX file from your therapist.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reports.map((report) => {
+                const isExpanded = expandedReportId === report.id;
+                return (
+                  <div
+                    key={report.id}
+                    className="rounded-lg bg-gray-800 border border-gray-700 overflow-hidden"
+                  >
+                    <div className="flex items-center justify-between p-4">
+                      <div
+                        className="flex-1 min-w-0 cursor-pointer"
+                        onClick={() =>
+                          setExpandedReportId(isExpanded ? null : report.id)
+                        }
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-medium text-white truncate">
+                            {report.title}
+                          </p>
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "shrink-0 text-xs",
+                              report.type === "GENERATED"
+                                ? "border-green-500/40 text-green-400"
+                                : "border-blue-500/40 text-blue-400",
+                            )}
+                          >
+                            {report.type === "GENERATED" ? "Generated" : "Uploaded"}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {formatDate(report.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4 shrink-0">
+                        {report.url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-gray-600 text-gray-300 hover:bg-gray-700 bg-transparent"
+                            asChild
+                          >
+                            <a
+                              href={report.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              download
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+                        {(report.summary || report.mostCommonIssues.length > 0) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-gray-400 hover:text-white"
+                            onClick={() =>
+                              setExpandedReportId(isExpanded ? null : report.id)
+                            }
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="px-4 pb-4 border-t border-gray-700 pt-3 space-y-3">
+                        {report.mostCommonIssues.length > 0 && (
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                              Common Issues
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {report.mostCommonIssues.map((issue) => (
+                                <Badge
+                                  key={issue}
+                                  variant="secondary"
+                                  className="bg-gray-700 text-gray-200"
+                                >
+                                  {issue}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {report.summary && (
+                          <div>
+                            <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
+                              Summary
+                            </p>
+                            <p className="text-sm text-gray-300 whitespace-pre-wrap line-clamp-12">
+                              {report.summary}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <ProtectedRoute>
+      <ReportsView />
+    </ProtectedRoute>
   );
 }
