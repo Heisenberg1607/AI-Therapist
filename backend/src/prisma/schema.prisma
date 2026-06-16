@@ -19,6 +19,7 @@ model User{
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   sessions  Session[]
+  reports   Report[]
 }
 
 model Session {
@@ -32,6 +33,8 @@ model Session {
   mood        String?  // mood at start (onboarding Q3)
   topic       String?  // main topic (onboarding Q1)
   durationSec Int?     // session length in seconds
+  ratingScores  Json?  // LLM-judge scores per metric (empathy, conciseness, …), each 1-5
+  ratingOverall Float? // average of the metric scores (out of 5)
 }
 
 model Message {
@@ -46,4 +49,24 @@ model Message {
 enum Sender {
   USER
   AI
+}
+
+enum ReportType {
+  GENERATED
+  UPLOADED
+}
+
+model Report {
+  id               String     @id @default(uuid())
+  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId           String
+  type             ReportType
+  title            String
+  summary          String? // markdown body (generated reports)
+  mostCommonIssues String[]   @default([]) // generated reports
+  filePath         String // {userId}/{id}.{ext} in the private `reports` bucket
+  fileType         String // mime type
+  createdAt        DateTime   @default(now())
+
+  @@index([userId])
 }

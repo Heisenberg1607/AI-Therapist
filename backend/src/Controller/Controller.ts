@@ -3,7 +3,8 @@ import { Request,Response } from "express";
 import { AIgenerateResponse } from "../Service/Service";
 // import { generateSpeechFromMurf } from "../Service/MurfService";
 // import { generateSpeechFromElevenLabs } from "../Service/ElevanLabsService";
-import { Sender } from "@prisma/client";
+import { Sender, ReportType } from "@prisma/client";
+import { randomUUID } from "crypto";
 import {
   createMessage,
   getMessagesBySession,
@@ -13,9 +14,21 @@ import {
   createSession,
   updateSessionSummary,
   getSessionsByUser,
+  setSessionRating,
+  getUngradedSessionIds,
+  getRatedSessions,
 } from "../Model/sessionModel";
+import {
+  gradeSessionTranscript,
+  overallScore,
+  RATING_METRICS,
+} from "../Service/sessionRatingService";
 import { getNearbyClinics } from "../Model/clinicModel";
 import { getUserAnalytics, AnalyticsRange } from "../Model/analyticsModel";
+import { createReport, getReportsByUser } from "../Model/reportModel";
+import { generateReportContent } from "../Service/reportService";
+import { renderReportPdf } from "../utils/reportPdf";
+import { uploadReportFile, signedReportUrl } from "../utils/supabaseStorage";
 import { AuthRequest } from "../middleware/authMiddleware";
 import {
   createUser,
@@ -170,6 +183,10 @@ export const saveSessionSummary = async (req: AuthRequest, res: Response) => {
     if (count === 0) {
       return res.status(404).json({ message: "Session not found" });
     }
+    // Grade the just-finished session in the background (don't block the response).
+    void gradeAndStoreSession(sessionId).catch((e: unknown) =>
+      console.error("saveSessionSummary: grading failed", e),
+    );
     res.status(200).json({ ok: true });
   } catch (error) {
     console.error("saveSessionSummary error", error);
@@ -217,6 +234,193 @@ export const getAnalytics = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("getAnalytics error", error);
     res.status(500).json({ message: "Failed to fetch analytics" });
+  }
+};
+
+// ---- Reports -----------------------------------------------------------
+
+const REPORT_SESSION_COUNT = 3;
+const UPLOAD_MIME_EXT: Record<string, string> = {
+  "application/pdf": "pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+  "application/msword": "doc",
+};
+
+// Generate a clinical report from the user's last 3 sessions, render a PDF,
+// store it privately, and persist a Report row.
+export const generateReport = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const recent = (await getSessionsByUser(userId)).slice(0, REPORT_SESSION_COUNT);
+    if (recent.length === 0) {
+      return res.status(400).json({ message: "No sessions to generate a report from." });
+    }
+
+    // Oldest-of-the-three first, so the report reads chronologically.
+    const blocks: string[] = [];
+    for (const s of [...recent].reverse()) {
+      const messages = await getMessagesBySession(s.id);
+      if (messages.length === 0) continue;
+      const lines = messages.map(
+        (m) => `${m.sender === "USER" ? "Client" : "Therapist"}: ${m.content}`,
+      );
+      const dateStr = s.createdAt.toISOString().slice(0, 10);
+      blocks.push(
+        `--- Session on ${dateStr}${s.topic ? ` (topic: ${s.topic})` : ""} ---\n${lines.join("\n")}`,
+      );
+    }
+    if (blocks.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "Not enough conversation history to generate a report." });
+    }
+
+    const content = await generateReportContent(blocks.join("\n\n"));
+    const id = randomUUID();
+    const pdf = await renderReportPdf(content.title, content.report);
+    const filePath = `${userId}/${id}.pdf`;
+    await uploadReportFile(filePath, pdf, "application/pdf");
+
+    const report = await createReport({
+      id,
+      userId,
+      type: ReportType.GENERATED,
+      title: content.title,
+      summary: content.report,
+      mostCommonIssues: content.mostCommonIssues,
+      filePath,
+      fileType: "application/pdf",
+    });
+
+    const url = await signedReportUrl(filePath);
+    res.status(201).json({ report: { ...report, url } });
+  } catch (error) {
+    console.error("generateReport error", error);
+    res.status(500).json({ message: "Failed to generate report" });
+  }
+};
+
+// List the user's reports with fresh signed download URLs.
+export const listReports = async (req: AuthRequest, res: Response) => {
+  try {
+    const reports = await getReportsByUser(req.userId!);
+    const withUrls = await Promise.all(
+      reports.map(async (r) => ({
+        ...r,
+        url: await signedReportUrl(r.filePath).catch(() => null),
+      })),
+    );
+    res.status(200).json({ reports: withUrls });
+  } catch (error) {
+    console.error("listReports error", error);
+    res.status(500).json({ message: "Failed to fetch reports" });
+  }
+};
+
+// Store a user-uploaded report file (PDF/DOCX) and persist a Report row.
+export const uploadReport = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    // multer populates req.file; type it locally to avoid relying on global augmentation.
+    const file = (req as unknown as {
+      file?: { buffer: Buffer; mimetype: string; originalname: string };
+    }).file;
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded." });
+    }
+    const ext = UPLOAD_MIME_EXT[file.mimetype];
+    if (!ext) {
+      return res.status(400).json({ message: "Only PDF or DOCX files are allowed." });
+    }
+
+    const id = randomUUID();
+    const filePath = `${userId}/${id}.${ext}`;
+    await uploadReportFile(filePath, file.buffer, file.mimetype);
+
+    const report = await createReport({
+      id,
+      userId,
+      type: ReportType.UPLOADED,
+      title: file.originalname || `Uploaded report.${ext}`,
+      summary: null,
+      mostCommonIssues: [],
+      filePath,
+      fileType: file.mimetype,
+    });
+
+    const url = await signedReportUrl(filePath);
+    res.status(201).json({ report: { ...report, url } });
+  } catch (error) {
+    console.error("uploadReport error", error);
+    res.status(500).json({ message: "Failed to upload report" });
+  }
+};
+
+// ---- Session ratings (LLM-as-judge) -----------------------------------
+
+const MAX_BACKFILL = 50;
+
+// Grade one session's transcript on the 5 metrics and persist the scores.
+// Returns null when the session has no messages. Safe to call fire-and-forget.
+async function gradeAndStoreSession(sessionId: string) {
+  const messages = await getMessagesBySession(sessionId);
+  if (messages.length === 0) return null;
+  const transcript = messages
+    .map((m) => `${m.sender === "USER" ? "Client" : "Therapist"}: ${m.content}`)
+    .join("\n");
+  const scores = await gradeSessionTranscript(transcript);
+  const overall = overallScore(scores);
+  await setSessionRating(sessionId, scores, overall);
+  return { scores, overall };
+}
+
+// Grade all of the user's not-yet-graded sessions (capped per request).
+export const backfillRatings = async (req: AuthRequest, res: Response) => {
+  try {
+    const ids = (await getUngradedSessionIds(req.userId!)).slice(0, MAX_BACKFILL);
+    let graded = 0;
+    for (const id of ids) {
+      try {
+        const result = await gradeAndStoreSession(id);
+        if (result) graded++;
+      } catch (e) {
+        console.error("backfillRatings: failed to grade", id, e);
+      }
+    }
+    res.status(200).json({ graded });
+  } catch (error) {
+    console.error("backfillRatings error", error);
+    res.status(500).json({ message: "Failed to backfill ratings" });
+  }
+};
+
+// Average session rating across the user's graded sessions (per metric + overall).
+export const getRatingsSummary = async (req: AuthRequest, res: Response) => {
+  try {
+    const rated = await getRatedSessions(req.userId!);
+    if (rated.length === 0) {
+      return res.status(200).json({ ratings: null });
+    }
+    const sums: Record<string, number> = {};
+    for (const m of RATING_METRICS) sums[m] = 0;
+    let overallSum = 0;
+    for (const s of rated) {
+      const scores = (s.ratingScores as unknown as Record<string, number>) ?? {};
+      for (const m of RATING_METRICS) sums[m] += Number(scores[m] ?? 0);
+      overallSum += Number(s.ratingOverall ?? 0);
+    }
+    const n = rated.length;
+    const round1 = (total: number) => Math.round((total / n) * 10) / 10;
+    res.status(200).json({
+      ratings: {
+        count: n,
+        overall: round1(overallSum),
+        metrics: RATING_METRICS.map((m) => ({ metric: m, score: round1(sums[m]) })),
+      },
+    });
+  } catch (error) {
+    console.error("getRatingsSummary error", error);
+    res.status(500).json({ message: "Failed to fetch ratings" });
   }
 };
 

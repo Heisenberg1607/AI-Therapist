@@ -1,4 +1,5 @@
 import { prisma } from "../prisma/prismaClient";
+import { Prisma } from "@prisma/client";
 
 export const createSession = async (userId?: string) => {
   const sessionData: any = {};
@@ -56,5 +57,40 @@ export const getSessionsByUser = async (userId: string) => {
       durationSec: true,
       crisisFlag: true,
     },
+  });
+};
+
+// Persist LLM-judge rating scores for a session.
+export const setSessionRating = async (
+  sessionId: string,
+  scores: Record<string, number>,
+  overall: number,
+) => {
+  return prisma.session.update({
+    where: { id: sessionId },
+    data: {
+      ratingScores: scores as Prisma.InputJsonValue,
+      ratingOverall: overall,
+    },
+  });
+};
+
+// IDs of the user's sessions that haven't been graded yet (newest first).
+export const getUngradedSessionIds = async (
+  userId: string,
+): Promise<string[]> => {
+  const rows = await prisma.session.findMany({
+    where: { userId, ratingOverall: null },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map((r) => r.id);
+};
+
+// The user's graded sessions (scores only), for averaging.
+export const getRatedSessions = async (userId: string) => {
+  return prisma.session.findMany({
+    where: { userId, ratingOverall: { not: null } },
+    select: { ratingScores: true, ratingOverall: true },
   });
 };

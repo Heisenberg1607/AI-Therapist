@@ -12,10 +12,22 @@ import {
   getSessionMessages,
   getAnalytics,
   getClinics,
+  generateReport,
+  listReports,
+  uploadReport,
+  backfillRatings,
+  getRatingsSummary,
 } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
+import multer from "multer";
 
 const router: Router = express.Router();
+
+// In-memory uploads for user-provided report files (PDF/DOCX), capped at 10 MB.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
 
 // Public routes
 router.post("/login", login);
@@ -94,6 +106,56 @@ router.get("/sessions/:sessionId/messages", authenticate, async (req, res, next)
 router.get("/analytics", authenticate, async (req, res, next) => {
   try {
     await getAnalytics(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Reports — generate a clinical report from the user's last 3 sessions
+router.post("/reports/generate", authenticate, async (req, res, next) => {
+  try {
+    await generateReport(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// List the user's reports (with fresh signed download URLs)
+router.get("/reports", authenticate, async (req, res, next) => {
+  try {
+    await listReports(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Upload the user's own report file (PDF/DOCX)
+router.post(
+  "/reports/upload",
+  authenticate,
+  upload.single("file"),
+  async (req, res, next) => {
+    try {
+      await uploadReport(req, res);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Score the user's not-yet-graded sessions (LLM-as-judge, 5 metrics)
+router.post("/reports/ratings/backfill", authenticate, async (req, res, next) => {
+  try {
+    await backfillRatings(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Average session rating across the user's graded sessions
+router.get("/reports/ratings", authenticate, async (req, res, next) => {
+  try {
+    await getRatingsSummary(req, res);
   } catch (error) {
     next(error);
   }
