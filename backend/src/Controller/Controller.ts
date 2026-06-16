@@ -283,22 +283,57 @@ export const generateReport = async (req: AuthRequest, res: Response) => {
         .json({ message: "Not enough conversation history to generate a report." });
     }
 
-    const content = await generateReportContent(blocks.join("\n\n"));
-    const id = randomUUID();
-    const pdf = await renderReportPdf(content.title, content.report);
-    const filePath = `${userId}/${id}.pdf`;
-    await uploadReportFile(filePath, pdf, "application/pdf");
+    let content;
+    try {
+      content = await generateReportContent(blocks.join("\n\n"));
+    } catch (error) {
+      console.error("generateReport: OpenAI step failed", error);
+      return res.status(500).json({ message: "Failed to generate report content." });
+    }
 
-    const report = await createReport({
-      id,
-      userId,
-      type: ReportType.GENERATED,
-      title: content.title,
-      summary: content.report,
-      mostCommonIssues: content.mostCommonIssues,
-      filePath,
-      fileType: "application/pdf",
-    });
+    const id = randomUUID();
+    let pdf: Buffer;
+    try {
+      pdf = await renderReportPdf(content.title, content.report);
+    } catch (error) {
+      console.error("generateReport: PDF step failed", error);
+      return res.status(500).json({ message: "Failed to render report PDF." });
+    }
+
+    const filePath = `${userId}/${id}.pdf`;
+    try {
+      await uploadReportFile(filePath, pdf, "application/pdf");
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : "Unknown storage error";
+      console.error("generateReport: Supabase upload failed", error);
+      return res.status(500).json({
+        message:
+          msg.includes("SUPABASE") || msg.includes("supabase")
+            ? "Report storage is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server."
+            : "Failed to upload report file. Ensure the Supabase 'reports' bucket exists.",
+      });
+    }
+
+    let report;
+    try {
+      report = await createReport({
+        id,
+        userId,
+        type: ReportType.GENERATED,
+        title: content.title,
+        summary: content.report,
+        mostCommonIssues: content.mostCommonIssues,
+        filePath,
+        fileType: "application/pdf",
+      });
+    } catch (error) {
+      console.error("generateReport: DB step failed", error);
+      return res.status(500).json({
+        message:
+          "Failed to save report. Run database migrations (Report table may be missing).",
+      });
+    }
 
     const url = await signedReportUrl(filePath);
     res.status(201).json({ report: { ...report, url } });
