@@ -144,25 +144,25 @@ const ChatPage = () => {
     setBotThinking(false);
 
     const summary = await summarizeTranscript(transcript);
-    const mood = answers.mood ?? "";
     const topic = answers.reason ?? "";
 
     // Persist to the DB so the same user can fetch it on future visits.
+    // Mood is no longer sent — the server derives start/end mood from the transcript.
     if (currentSessionId) {
       await saveSessionSummary(currentSessionId, {
         summary,
-        mood,
         topic,
         durationSec: duration,
       }).catch(() => {});
     }
 
-    // Local copy (offline fallback for the dashboard).
+    // Local copy (offline fallback for the dashboard). Mood is left blank here;
+    // the real start/end mood is derived server-side and read back from the DB.
     saveSession({
       id: currentSessionId ?? String(Date.now()),
       date: new Date().toISOString(),
       duration,
-      mood,
+      mood: "",
       topic,
       summary,
       transcript,

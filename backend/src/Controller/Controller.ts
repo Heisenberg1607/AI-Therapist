@@ -17,12 +17,15 @@ import {
   setSessionRating,
   getUngradedSessionIds,
   getRatedSessions,
+  setSessionMoods,
+  getSessionIdsMissingMood,
 } from "../Model/sessionModel";
 import {
   gradeSessionTranscript,
   overallScore,
   RATING_METRICS,
 } from "../Service/sessionRatingService";
+import { deriveSessionMoods } from "../Service/moodService";
 import { getNearbyClinics } from "../Model/clinicModel";
 import { getUserAnalytics, AnalyticsRange } from "../Model/analyticsModel";
 import { createReport, getReportsByUser } from "../Model/reportModel";
@@ -173,10 +176,11 @@ export const completeOnboarding = async (req: AuthRequest, res: Response) => {
 export const saveSessionSummary = async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId } = req.params as { sessionId: string };
-    const { summary, mood, topic, durationSec } = req.body;
+    // mood is intentionally ignored — it's derived from the transcript below,
+    // not taken from the onboarding answer the client sends.
+    const { summary, topic, durationSec } = req.body;
     const count = await updateSessionSummary(sessionId, req.userId!, {
       summary,
-      mood,
       topic,
       durationSec,
     });
@@ -186,6 +190,10 @@ export const saveSessionSummary = async (req: AuthRequest, res: Response) => {
     // Grade the just-finished session in the background (don't block the response).
     void gradeAndStoreSession(sessionId).catch((e: unknown) =>
       console.error("saveSessionSummary: grading failed", e),
+    );
+    // Derive start/end mood from the transcript in the background, too.
+    void deriveAndStoreSessionMoods(sessionId).catch((e: unknown) =>
+      console.error("saveSessionSummary: mood derivation failed", e),
     );
     res.status(200).json({ ok: true });
   } catch (error) {
@@ -391,6 +399,40 @@ export const backfillRatings = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("backfillRatings error", error);
     res.status(500).json({ message: "Failed to backfill ratings" });
+  }
+};
+
+// Derive one session's start/end mood from its transcript and persist it.
+// Returns null when the session has no messages. Safe to call fire-and-forget.
+async function deriveAndStoreSessionMoods(sessionId: string) {
+  const messages = await getMessagesBySession(sessionId);
+  if (messages.length === 0) return null;
+  const transcript = messages
+    .map((m) => `${m.sender === "USER" ? "Client" : "Therapist"}: ${m.content}`)
+    .join("\n");
+  const moods = await deriveSessionMoods(transcript);
+  await setSessionMoods(sessionId, moods.moodStart, moods.moodEnd);
+  return moods;
+}
+
+// Derive moods for all of the user's sessions that don't have one yet
+// (capped per request). Backfills the mood timeline from stored transcripts.
+export const backfillMoods = async (req: AuthRequest, res: Response) => {
+  try {
+    const ids = (await getSessionIdsMissingMood(req.userId!)).slice(0, MAX_BACKFILL);
+    let derived = 0;
+    for (const id of ids) {
+      try {
+        const result = await deriveAndStoreSessionMoods(id);
+        if (result && (result.moodStart || result.moodEnd)) derived++;
+      } catch (e) {
+        console.error("backfillMoods: failed to derive", id, e);
+      }
+    }
+    res.status(200).json({ derived });
+  } catch (error) {
+    console.error("backfillMoods error", error);
+    res.status(500).json({ message: "Failed to backfill moods" });
   }
 };
 

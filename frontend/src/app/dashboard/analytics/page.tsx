@@ -26,6 +26,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -38,6 +39,8 @@ import {
   Brain,
   Loader2,
   Activity,
+  Clock,
+  Heart,
 } from "lucide-react";
 import { ProtectedRoute } from "../../Components/ProtectedRoute";
 import {
@@ -45,16 +48,7 @@ import {
   type AnalyticsRange,
   type UserAnalytics,
 } from "../../lib/api";
-import { moodToScore } from "@/lib/sessionStorage";
-
-const SCORE_LABELS: Record<number, string> = {
-  1: "Overwhelmed",
-  2: "Numb",
-  3: "Sad",
-  4: "Anxious",
-  5: "Angry",
-  6: "Okay",
-};
+import { moodToScore, SCORE_LABELS } from "@/lib/sessionStorage";
 
 const GREEN = "#22c55e";
 
@@ -141,8 +135,10 @@ function AnalyticsView() {
     () =>
       (data?.moodTimeline ?? []).map((m) => ({
         label: shortDate(m.date),
-        score: moodToScore(m.mood),
-        mood: m.mood,
+        start: m.moodStart ? moodToScore(m.moodStart) : null,
+        end: m.moodEnd ? moodToScore(m.moodEnd) : null,
+        startMood: m.moodStart ?? "—",
+        endMood: m.moodEnd ?? "—",
       })),
     [data],
   );
@@ -174,7 +170,7 @@ function AnalyticsView() {
     if (!data || data.totalSessions === 0) return [];
     const out: string[] = [];
     if (data.moodDistribution[0])
-      out.push(`Your most common starting mood is "${data.moodDistribution[0].mood}".`);
+      out.push(`You most often end sessions feeling "${data.moodDistribution[0].mood}".`);
     if (data.topicDistribution[0])
       out.push(`You talk about "${data.topicDistribution[0].topic}" most often.`);
     out.push(
@@ -182,9 +178,13 @@ function AnalyticsView() {
     );
     if (data.currentStreakDays > 1)
       out.push(`You're on a ${data.currentStreakDays}-day streak.`);
-    if (moodData.length >= 2) {
-      const first = moodData[0].score;
-      const last = moodData[moodData.length - 1].score;
+    // Trend across sessions, based on how each session ENDS.
+    const ends = moodData
+      .map((m) => m.end)
+      .filter((v): v is number => v != null);
+    if (ends.length >= 2) {
+      const first = ends[0];
+      const last = ends[ends.length - 1];
       if (last > first) out.push("Your mood is trending up over this period.");
       else if (last < first) out.push("Your mood has dipped over this period.");
     }
@@ -235,6 +235,38 @@ function AnalyticsView() {
         </Card>
       ) : (
         <>
+          {/* Top KPI summary */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <MetricCard
+              title="Total Sessions"
+              value={`${data.totalSessions}`}
+              subtitle={
+                data.daysSinceLast != null
+                  ? `Last session ${data.daysSinceLast}d ago`
+                  : undefined
+              }
+              icon={<Activity className="h-4 w-4 text-green-500" />}
+            />
+            <MetricCard
+              title="Messages"
+              value={`${data.messages.total}`}
+              subtitle={`${data.messages.avgPerSession} per session`}
+              icon={<MessageSquare className="h-4 w-4 text-green-500" />}
+            />
+            <MetricCard
+              title="Avg Session Time"
+              value={formatMinutes(data.avgDurationSec)}
+              subtitle="Per session"
+              icon={<Clock className="h-4 w-4 text-green-500" />}
+            />
+            <MetricCard
+              title="Most Common Mood"
+              value={data.moodDistribution[0]?.mood ?? "—"}
+              subtitle="How sessions usually end"
+              icon={<Heart className="h-4 w-4 text-green-500" />}
+            />
+          </div>
+
           <Tabs defaultValue="overview" className="space-y-6">
             <TabsList className="bg-gray-900 border border-gray-800">
               {["overview", "engagement", "insights"].map((t) => (
@@ -255,7 +287,7 @@ function AnalyticsView() {
                   <CardHeader>
                     <CardTitle className="text-white">Mood over time</CardTitle>
                     <CardDescription className="text-gray-400">
-                      Starting mood per session
+                      Mood at the start vs end of each session
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -278,17 +310,36 @@ function AnalyticsView() {
                           />
                           <Tooltip
                             contentStyle={tooltipStyle}
-                            formatter={(_v, _n, item) => [
-                              (item?.payload as { mood?: string })?.mood ?? "",
-                              "Mood",
-                            ]}
+                            formatter={(_v, name, item) => {
+                              const p = item?.payload as {
+                                startMood?: string;
+                                endMood?: string;
+                              };
+                              return name === "Start"
+                                ? [p?.startMood ?? "—", "Start"]
+                                : [p?.endMood ?? "—", "End"];
+                            }}
+                          />
+                          <Legend wrapperStyle={{ fontSize: 12 }} />
+                          <Line
+                            type="monotone"
+                            dataKey="start"
+                            name="Start"
+                            stroke={GREEN}
+                            strokeOpacity={0.4}
+                            strokeDasharray="4 4"
+                            strokeWidth={2}
+                            dot={{ r: 2, fill: GREEN, fillOpacity: 0.4 }}
+                            connectNulls
                           />
                           <Line
                             type="monotone"
-                            dataKey="score"
+                            dataKey="end"
+                            name="End"
                             stroke={GREEN}
                             strokeWidth={2}
                             dot={{ r: 3, fill: GREEN }}
+                            connectNulls
                           />
                         </LineChart>
                       </ResponsiveContainer>

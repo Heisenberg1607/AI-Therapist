@@ -14,8 +14,10 @@ export type SessionData = {
   date: string;
   /** Duration in seconds. */
   duration: number;
-  /** Mood at start of session (onboarding Q3). */
+  /** Mood at the START of the session, derived from the transcript. */
   mood: string;
+  /** Mood at the END of the session, derived from the transcript. */
+  moodEnd?: string;
   /** Main topic (onboarding Q1). */
   topic: string;
   /** AI-generated 2-3 sentence summary. */
@@ -23,14 +25,29 @@ export type SessionData = {
   transcript: TranscriptTurn[];
 };
 
-// Maps onboarding mood answers to a numeric score for the timeline chart.
+// Maps a mood label to a numeric score (1 = worst, 6 = best) for the timeline chart.
+// Ordered by emotional valence so a start→end change reads correctly (a higher
+// score = a calmer/better state). The two anchors are firm — Overwhelmed is the
+// most distressed, "Okay but struggling" the most settled; the middle four are all
+// negative states, so their ordering is a judgement call you can tune.
 export const MOOD_SCORES: Record<string, number> = {
   Overwhelmed: 1,
-  Numb: 2,
-  Sad: 3,
-  Anxious: 4,
-  Angry: 5,
+  Anxious: 2,
+  Angry: 3,
+  Sad: 4,
+  Numb: 5,
   "Okay but struggling": 6,
+};
+
+// Short label per score (1..6) for chart Y-axis ticks. Must stay in valence
+// order with MOOD_SCORES above ("Okay" is the short form of "Okay but struggling").
+export const SCORE_LABELS: Record<number, string> = {
+  1: "Overwhelmed",
+  2: "Anxious",
+  3: "Angry",
+  4: "Sad",
+  5: "Numb",
+  6: "Okay",
 };
 
 export function moodToScore(mood: string): number {

@@ -20,12 +20,13 @@ export const getSessionById = async (sessionId: string) => {
 
 type SessionSummaryInput = {
   summary?: string;
-  mood?: string;
   topic?: string;
   durationSec?: number;
 };
 
 // Update a session's summary/metadata, scoped to the owning user.
+// NOTE: mood is no longer written here — it's derived from the transcript
+// (see setSessionMoods), not taken from the onboarding answer.
 export const updateSessionSummary = async (
   sessionId: string,
   userId: string,
@@ -35,12 +36,37 @@ export const updateSessionSummary = async (
     where: { id: sessionId, userId },
     data: {
       summary: data.summary,
-      mood: data.mood,
       topic: data.topic,
       durationSec: data.durationSec,
     },
   });
   return result.count; // 0 if not found / not owned
+};
+
+// Persist the transcript-derived start/end moods for a session.
+// `mood` holds the start-of-session mood; `moodEnd` the end-of-session mood.
+export const setSessionMoods = async (
+  sessionId: string,
+  moodStart: string | null,
+  moodEnd: string | null,
+) => {
+  return prisma.session.update({
+    where: { id: sessionId },
+    data: { mood: moodStart, moodEnd },
+  });
+};
+
+// Sessions still missing a derived mood (no start mood yet), newest first.
+// Used by the mood backfill to find sessions to score from their transcripts.
+export const getSessionIdsMissingMood = async (
+  userId: string,
+): Promise<string[]> => {
+  const rows = await prisma.session.findMany({
+    where: { userId, mood: null },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map((r) => r.id);
 };
 
 // All sessions for a user, newest first — fields the dashboard needs.
@@ -53,6 +79,7 @@ export const getSessionsByUser = async (userId: string) => {
       createdAt: true,
       summary: true,
       mood: true,
+      moodEnd: true,
       topic: true,
       durationSec: true,
       crisisFlag: true,

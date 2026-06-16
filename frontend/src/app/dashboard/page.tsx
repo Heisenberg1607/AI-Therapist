@@ -16,8 +16,10 @@ import {
   LineChart,
   Line,
   XAxis,
+  YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
 } from "recharts";
 import {
   MessageSquare,
@@ -87,7 +89,8 @@ function OverviewView() {
     () =>
       (analytics?.moodTimeline ?? []).map((m) => ({
         label: shortDate(m.date),
-        score: moodToScore(m.mood),
+        start: m.moodStart ? moodToScore(m.moodStart) : null,
+        end: m.moodEnd ? moodToScore(m.moodEnd) : null,
       })),
     [analytics],
   );
@@ -208,7 +211,7 @@ function OverviewView() {
                 Mood trend
               </CardTitle>
               <CardDescription className="text-gray-400">
-                Starting mood across your sessions
+                Mood at the start vs end of each session
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -225,6 +228,13 @@ function OverviewView() {
                       tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
                       tickLine={false}
                     />
+                    <YAxis
+                      domain={[1, 6]}
+                      ticks={[1, 2, 3, 4, 5, 6]}
+                      tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 11 }}
+                      tickLine={false}
+                      width={24}
+                    />
                     <Tooltip
                       contentStyle={{
                         background: "hsl(240, 20%, 8%)",
@@ -233,12 +243,26 @@ function OverviewView() {
                         color: "#fff",
                       }}
                     />
+                    <Legend wrapperStyle={{ fontSize: 12 }} />
                     <Line
                       type="monotone"
-                      dataKey="score"
+                      dataKey="start"
+                      name="Start"
+                      stroke={GREEN}
+                      strokeOpacity={0.4}
+                      strokeDasharray="4 4"
+                      strokeWidth={2}
+                      dot={{ r: 2, fill: GREEN, fillOpacity: 0.4 }}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="end"
+                      name="End"
                       stroke={GREEN}
                       strokeWidth={2}
                       dot={{ r: 3, fill: GREEN }}
+                      connectNulls
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -256,7 +280,7 @@ function OverviewView() {
             <CardContent className="space-y-4">
               <Glance
                 icon={<Heart className="h-4 w-4 text-green-500" />}
-                label="Most common mood"
+                label="Most common ending mood"
                 value={topMood}
               />
               <Glance

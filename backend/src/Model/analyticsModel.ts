@@ -27,8 +27,15 @@ export interface UserAnalytics {
   currentStreakDays: number;
   daysSinceLast: number | null;
   crisisCount: number;
-  // `mood` is the raw onboarding mood; the client maps it to a score via moodToScore.
-  moodTimeline: { date: string; mood: string }[];
+  // Transcript-derived moods (one of the 6 MOOD_LABELS). moodStart/moodEnd are the
+  // client's mood at the start/end of each session; the client maps each to a score
+  // via moodToScore to chart the start→end trend.
+  moodTimeline: {
+    date: string;
+    moodStart: string | null;
+    moodEnd: string | null;
+  }[];
+  // Distribution of how sessions END (moodEnd), most frequent first.
   moodDistribution: { mood: string; count: number }[];
   topicDistribution: { topic: string; count: number }[];
   sessionsByDay: { date: string; count: number }[];
@@ -86,6 +93,7 @@ export const getUserAnalytics = async (
       id: true,
       createdAt: true,
       mood: true,
+      moodEnd: true,
       topic: true,
       durationSec: true,
       crisisFlag: true,
@@ -145,12 +153,16 @@ export const getUserAnalytics = async (
     daysSinceLast,
     crisisCount: sessions.filter((s) => s.crisisFlag).length,
     moodTimeline: sessions
-      .filter((s) => (s.mood ?? "").trim())
-      .map((s) => ({ date: s.createdAt.toISOString(), mood: s.mood as string })),
-    moodDistribution: countBy(sessions, (s) => s.mood).map(({ key, count }) => ({
-      mood: key,
-      count,
-    })),
+      .filter((s) => (s.mood ?? "").trim() || (s.moodEnd ?? "").trim())
+      .map((s) => ({
+        date: s.createdAt.toISOString(),
+        moodStart: (s.mood ?? "").trim() || null,
+        moodEnd: (s.moodEnd ?? "").trim() || null,
+      })),
+    // Distribution keys off how sessions END (moodEnd).
+    moodDistribution: countBy(sessions, (s) => s.moodEnd).map(
+      ({ key, count }) => ({ mood: key, count }),
+    ),
     topicDistribution: countBy(sessions, (s) => s.topic).map(
       ({ key, count }) => ({ topic: key, count }),
     ),

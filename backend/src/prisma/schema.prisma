@@ -30,7 +30,8 @@ model Session {
   messages    Message[]
   crisisFlag  Boolean  @default(false) @map("crisis_flag")
   summary     String?  // AI-generated post-session summary
-  mood        String?  // mood at start (onboarding Q3)
+  mood        String?  // mood at the START of the conversation, derived from the transcript (one of MOOD_LABELS)
+  moodEnd     String?  // mood at the END of the conversation, derived from the transcript (one of MOOD_LABELS)
   topic       String?  // main topic (onboarding Q1)
   durationSec Int?     // session length in seconds
   ratingScores  Json?  // LLM-judge scores per metric (empathy, conciseness, …), each 1-5

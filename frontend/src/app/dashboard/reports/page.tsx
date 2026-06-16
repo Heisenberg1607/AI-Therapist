@@ -22,6 +22,7 @@ import {
   Loader2,
   Activity,
   AlertCircle,
+  Heart,
 } from "lucide-react";
 import { ProtectedRoute } from "../../Components/ProtectedRoute";
 import {
@@ -30,6 +31,7 @@ import {
   uploadReportApi,
   getRatingsSummaryApi,
   backfillRatingsApi,
+  backfillMoodsApi,
   type Report,
   type RatingsSummary,
 } from "../../lib/api";
@@ -80,6 +82,8 @@ function ReportsView() {
   const [generating, setGenerating] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [scoring, setScoring] = useState(false);
+  const [backfillingMoods, setBackfillingMoods] = useState(false);
+  const [moodMsg, setMoodMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [ratingExpanded, setRatingExpanded] = useState(false);
   const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
@@ -138,6 +142,24 @@ function ReportsView() {
     }
   };
 
+  const handleBackfillMoods = async () => {
+    setError(null);
+    setMoodMsg(null);
+    setBackfillingMoods(true);
+    try {
+      const { derived } = await backfillMoodsApi();
+      setMoodMsg(
+        derived > 0
+          ? `Derived mood for ${derived} session${derived === 1 ? "" : "s"}. Your mood graph is now up to date.`
+          : "All sessions already have a mood — nothing to backfill.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to backfill moods");
+    } finally {
+      setBackfillingMoods(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 mt-10 flex items-center justify-center text-gray-500 text-sm h-[60vh]">
@@ -169,6 +191,19 @@ function ReportsView() {
               if (file) handleUpload(file);
             }}
           />
+          <Button
+            variant="outline"
+            className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
+            disabled={backfillingMoods}
+            onClick={handleBackfillMoods}
+          >
+            {backfillingMoods ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Heart className="h-4 w-4 mr-2" />
+            )}
+            Backfill Moods
+          </Button>
           <Button
             variant="outline"
             className="border-gray-600 text-gray-300 hover:bg-gray-800 bg-transparent"
@@ -208,6 +243,21 @@ function ReportsView() {
         <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
           <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
           Generating your report from recent sessions — this may take a minute…
+        </div>
+      )}
+
+      {backfillingMoods && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          Analyzing past transcripts to derive each session&apos;s mood — this may
+          take a moment…
+        </div>
+      )}
+
+      {moodMsg && !backfillingMoods && (
+        <div className="mb-6 flex items-center gap-2 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+          <Heart className="h-4 w-4 shrink-0" />
+          {moodMsg}
         </div>
       )}
 

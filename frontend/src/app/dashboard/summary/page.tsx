@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -16,22 +17,14 @@ import { ProtectedRoute } from "../../Components/ProtectedRoute";
 import {
   getSessions,
   moodToScore,
+  SCORE_LABELS,
   type SessionData,
 } from "@/lib/sessionStorage";
 import { getSessionsApi, type DbSession } from "../../lib/api";
 
 const STARLIGHT = "hsl(72, 100%, 70%)";
 const NEBULA = "hsl(220, 80%, 65%)";
-
-// Short Y-axis labels for the mood scores 1..6.
-const SCORE_LABELS: Record<number, string> = {
-  1: "Overwhelmed",
-  2: "Numb",
-  3: "Sad",
-  4: "Anxious",
-  5: "Angry",
-  6: "Okay",
-};
+const NEBULA_FADED = "hsla(220, 80%, 65%, 0.4)";
 
 function formatDate(iso: string): string {
   try {
@@ -85,6 +78,7 @@ function SummaryDashboard() {
       date: s.createdAt,
       duration: s.durationSec ?? 0,
       mood: s.mood ?? "",
+      moodEnd: s.moodEnd ?? "",
       topic: s.topic ?? "",
       summary: s.summary ?? "",
       transcript: [],
@@ -95,7 +89,9 @@ function SummaryDashboard() {
       if (cancelled) return;
       if (db.length > 0) {
         // Keep only sessions that actually have a recorded summary/mood.
-        const usable = db.filter((s) => s.summary || s.mood || s.durationSec);
+        const usable = db.filter(
+          (s) => s.summary || s.mood || s.moodEnd || s.durationSec,
+        );
         setSessions((usable.length ? usable : db).map(mapDb));
       } else {
         setSessions(getSessions());
@@ -120,8 +116,10 @@ function SummaryDashboard() {
     () =>
       ordered.map((s, i) => ({
         date: formatDate(s.date),
-        score: moodToScore(s.mood),
-        mood: s.mood || "Unknown",
+        start: s.mood ? moodToScore(s.mood) : null,
+        end: s.moodEnd ? moodToScore(s.moodEnd) : null,
+        startMood: s.mood || "Unknown",
+        endMood: s.moodEnd || "Unknown",
         isLatest: i === ordered.length - 1,
       })),
     [ordered],
@@ -135,7 +133,8 @@ function SummaryDashboard() {
     ).length;
     return {
       total: sessions.length,
-      commonMood: mode(sessions.map((s) => s.mood)),
+      // How sessions most often END.
+      commonMood: mode(sessions.map((s) => s.moodEnd ?? "")),
       commonTopic: mode(sessions.map((s) => s.topic)),
       thisWeek,
     };
@@ -204,7 +203,7 @@ function SummaryDashboard() {
               <Stat icon={<Calendar className="w-4 h-4" />} label="Date" value={formatDate(latest.date)} />
               <Stat icon={<Clock className="w-4 h-4" />} label="Duration" value={formatDuration(latest.duration)} />
               <Stat icon={<MessageCircle className="w-4 h-4" />} label="Topic" value={latest.topic || "—"} />
-              <Stat icon={<Heart className="w-4 h-4" />} label="Mood at start" value={latest.mood || "—"} />
+              <Stat icon={<Heart className="w-4 h-4" />} label="Mood (start → end)" value={`${latest.mood || "—"} → ${latest.moodEnd || "—"}`} />
             </div>
 
             <div className="mt-8 pt-6 border-t border-white/10">
@@ -249,16 +248,35 @@ function SummaryDashboard() {
                     color: "#fff",
                   }}
                   labelStyle={{ color: "rgba(255,255,255,0.5)" }}
-                  formatter={(_value, _name, item) => [
-                    (item?.payload as { mood?: string })?.mood ?? "",
-                    "Mood",
-                  ]}
+                  formatter={(_value, name, item) => {
+                    const p = item?.payload as {
+                      startMood?: string;
+                      endMood?: string;
+                    };
+                    return name === "Start"
+                      ? [p?.startMood ?? "—", "Start"]
+                      : [p?.endMood ?? "—", "End"];
+                  }}
+                />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Line
+                  type="monotone"
+                  dataKey="start"
+                  name="Start"
+                  stroke={NEBULA_FADED}
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  dot={{ r: 3, fill: NEBULA_FADED }}
+                  connectNulls
+                  isAnimationActive
                 />
                 <Line
                   type="monotone"
-                  dataKey="score"
+                  dataKey="end"
+                  name="End"
                   stroke={NEBULA}
                   strokeWidth={2}
+                  connectNulls
                   dot={(props) => {
                     const { cx, cy, index, payload } = props as {
                       cx: number;
@@ -287,7 +305,8 @@ function SummaryDashboard() {
             </ResponsiveContainer>
           </div>
           <p className="mt-2 text-[11px] text-white/30">
-            The brightest point is your most recent session.
+            Dashed = mood at the start of each session, solid = at the end. The
+            brightest point is your most recent session.
           </p>
         </section>
 
@@ -308,7 +327,7 @@ function SummaryDashboard() {
                         {formatDate(s.date)}
                       </span>
                       <span className="text-sm text-starlight/80 w-28 shrink-0 truncate">
-                        {s.mood || "—"}
+                        {(s.mood || "—") + " → " + (s.moodEnd || "—")}
                       </span>
                       <span className="text-sm text-white/60 truncate hidden sm:block">
                         {s.topic || "—"}
@@ -338,7 +357,7 @@ function SummaryDashboard() {
             <p className={labelClass}>Insights</p>
             <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-6">
               <Stat label="Sessions" value={`${insights.total}`} big />
-              <Stat label="Most common mood" value={insights.commonMood} />
+              <Stat label="Most common ending mood" value={insights.commonMood} />
               <Stat label="Most common topic" value={insights.commonTopic} />
               <Stat label="This week" value={`${insights.thisWeek} sessions`} />
             </div>

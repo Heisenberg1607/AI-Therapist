@@ -17,6 +17,7 @@ import {
   uploadReport,
   backfillRatings,
   getRatingsSummary,
+  backfillMoods,
 } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
 import multer from "multer";
@@ -156,6 +157,15 @@ router.post("/reports/ratings/backfill", authenticate, async (req, res, next) =>
 router.get("/reports/ratings", authenticate, async (req, res, next) => {
   try {
     await getRatingsSummary(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Derive start/end mood for the user's sessions that don't have one yet
+router.post("/sessions/moods/backfill", authenticate, async (req, res, next) => {
+  try {
+    await backfillMoods(req, res);
   } catch (error) {
     next(error);
   }

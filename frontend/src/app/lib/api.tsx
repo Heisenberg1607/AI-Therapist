@@ -41,7 +41,8 @@ export interface DbSession {
   id: string;
   createdAt: string;
   summary: string | null;
-  mood: string | null;
+  mood: string | null; // mood at the START of the session (transcript-derived)
+  moodEnd: string | null; // mood at the END of the session (transcript-derived)
   topic: string | null;
   durationSec: number | null;
   crisisFlag: boolean;
@@ -68,7 +69,11 @@ export interface UserAnalytics {
   currentStreakDays: number;
   daysSinceLast: number | null;
   crisisCount: number;
-  moodTimeline: { date: string; mood: string }[];
+  moodTimeline: {
+    date: string;
+    moodStart: string | null;
+    moodEnd: string | null;
+  }[];
   moodDistribution: { mood: string; count: number }[];
   topicDistribution: { topic: string; count: number }[];
   sessionsByDay: { date: string; count: number }[];
@@ -213,9 +218,10 @@ export const completeOnboarding = async (
 };
 
 // Save a session's summary + metadata to the DB.
+// Mood is NOT sent — the server derives start/end mood from the transcript.
 export const saveSessionSummary = async (
   sessionId: string,
-  payload: { summary: string; mood: string; topic: string; durationSec: number },
+  payload: { summary: string; topic: string; durationSec: number },
 ): Promise<void> => {
   await fetch(`${API_BASE_URL}/sessions/${sessionId}/summary`, {
     method: "POST",
@@ -416,6 +422,24 @@ export const backfillRatingsApi = async (): Promise<{ graded: number }> => {
     }
     const error = await response.json();
     throw new Error(error.message || "Failed to score sessions");
+  }
+  return response.json();
+};
+
+// Derive start/end mood for the user's sessions that don't have one yet,
+// from their stored transcripts. Returns how many sessions got a mood.
+export const backfillMoodsApi = async (): Promise<{ derived: number }> => {
+  const response = await fetch(`${API_BASE_URL}/sessions/moods/backfill`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) {
+      removeToken();
+      throw new Error("Session expired. Please login again.");
+    }
+    const error = await response.json();
+    throw new Error(error.message || "Failed to backfill moods");
   }
   return response.json();
 };
