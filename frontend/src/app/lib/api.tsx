@@ -1,4 +1,4 @@
-import { getAuthHeaders, getToken, removeToken } from "./auth";
+import { getAuthHeaders, removeToken } from "./auth";
 import type { OnboardingAnswers } from "@/lib/buildSystemPrompt";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
