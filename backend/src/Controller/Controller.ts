@@ -30,6 +30,10 @@ import { getNearbyClinics } from "../Model/clinicModel";
 import { getUserAnalytics, AnalyticsRange } from "../Model/analyticsModel";
 import { createReport, getReportsByUser } from "../Model/reportModel";
 import { generateReportContent } from "../Service/reportService";
+import {
+  getHydraMemoryDashboard,
+  getHydraMemoryGraph,
+} from "../Service/hydraMemoryService";
 import { renderReportPdf } from "../utils/reportPdf";
 import { uploadReportFile, signedReportUrl } from "../utils/supabaseStorage";
 import { AuthRequest } from "../middleware/authMiddleware";
@@ -242,6 +246,39 @@ export const getAnalytics = async (req: AuthRequest, res: Response) => {
   } catch (error) {
     console.error("getAnalytics error", error);
     res.status(500).json({ message: "Failed to fetch analytics" });
+  }
+};
+
+// Long-term memories for the authenticated user. HydraDB is scoped with
+// sub_tenant_id = req.userId so one user cannot list another user's memories.
+export const getMemories = async (req: AuthRequest, res: Response) => {
+  try {
+    const memories = await getHydraMemoryDashboard(req.userId!);
+    res.status(200).json(memories);
+  } catch (error) {
+    console.error("getMemories error", error);
+    res.status(500).json({ message: "Failed to fetch memories" });
+  }
+};
+
+export const getMemoryGraph = async (req: AuthRequest, res: Response) => {
+  try {
+    const rawId = req.params.memoryId;
+    const memoryId = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (!memoryId) {
+      res.status(400).json({ message: "Memory id is required" });
+      return;
+    }
+
+    const graph = await getHydraMemoryGraph(req.userId!, memoryId);
+    res.status(200).json(graph);
+  } catch (error) {
+    if (error instanceof Error && error.message === "Memory not found") {
+      res.status(404).json({ message: "Memory not found" });
+      return;
+    }
+    console.error("getMemoryGraph error", error);
+    res.status(500).json({ message: "Failed to fetch memory graph" });
   }
 };
 

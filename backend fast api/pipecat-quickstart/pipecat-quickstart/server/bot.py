@@ -39,7 +39,7 @@ from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.turns.user_turn_strategies import UserTurnStrategies
 from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
-from pipecat.frames.frames import Frame, LLMFullResponseEndFrame, LLMRunFrame
+from pipecat.frames.frames import Frame, LLMContextFrame, LLMFullResponseEndFrame, LLMRunFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -62,6 +62,7 @@ from pipecat.transports.smallwebrtc.transport import SmallWebRTCTransport
 from pipecat.workers.runner import WorkerRunner
 
 import db
+import hydra_memory
 import improver
 import weave_eval
 
@@ -368,6 +369,193 @@ class RollingSummarizer(FrameProcessor):
             tag = "numb"  # neutral fallback when the model returns an off-list tag
         return summary, tag
 
+    async def final_summary(self) -> dict | None:
+        """Best available distilled summary for the whole session.
+
+        Returns {"summary": str, "emotional_tag": str}, or None if there is nothing
+        to summarize. Reuses the accumulated rolling summary when present; otherwise
+        distills the conversation in one shot so short sessions (< SUMMARY_INTERVAL
+        turns, no rolling summary yet) still yield a durable memory.
+        """
+        if self._accumulated_summary:
+            tag = self.summaries[-1]["emotional_tag"] if self.summaries else "numb"
+            return {"summary": self._accumulated_summary, "emotional_tag": tag}
+        recent = self._recent_turns_text()
+        if not recent:
+            return None
+        result = await self._summarize(None, recent)
+        if not result:
+            return None
+        summary_text, tag = result
+        return {"summary": summary_text, "emotional_tag": tag}
+
+
+class MemoryInjector(FrameProcessor):
+    """Inject cached HydraDB memories before each LLM response.
+
+    Sits between the user aggregator and the LLM. On every LLMContextFrame (the
+    frame that kicks the LLM), it reads the session-scoped memory cache and
+    injects a hidden "Relevant User Context" system message when memories are
+    available. HydraDB is not queried on each turn; refreshes are scheduled in the
+    background by SessionMemory.
+
+    Injection is best-effort: no user, no cache, or no memories all continue
+    normally without blocking the turn.
+    """
+
+    MEMORY_PREFIX = "Relevant User Context"
+
+    def __init__(
+        self,
+        context: LLMContext,
+        session_memory: hydra_memory.SessionMemory,
+        user_id: str | None,
+        start_message: str,
+    ):
+        super().__init__()
+        self._context = context
+        self._session_memory = session_memory
+        self._user_id = user_id
+        self._start_message = start_message
+        self._turn = 0
+
+    async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+        if isinstance(frame, LLMContextFrame) and direction == FrameDirection.DOWNSTREAM:
+            await self._before_llm_run()
+        await self.push_frame(frame, direction)
+
+    async def _before_llm_run(self):
+        try:
+            if not self._user_id:
+                logger.info("[MemoryInjector] cache=miss reason=no_user injected=0 chars=0")
+                self._inject_block("")
+                return
+            last_user = self._last_user_message()
+            if not last_user or last_user == self._start_message:
+                self._inject_block("")
+                return
+            self._turn += 1
+            is_second_response = self._turn == 1
+            if is_second_response and not self._session_memory.is_ready:
+                cache_ready = await self._session_memory.wait_until_ready(
+                    hydra_memory.SessionMemory.SECOND_RESPONSE_WAIT_SEC
+                )
+                logger.info(
+                    f"[MemoryInjector][second-response] wait_complete={cache_ready} "
+                    f"cached={len(self._session_memory.memories)}"
+                )
+            await self._session_memory.maybe_refresh_for_turn(
+                self._user_id, last_user, self._turn
+            )
+            block = self._inject_cached_block(second_response=is_second_response)
+            cache_state = "hit" if self._session_memory.memories else "miss"
+            if is_second_response:
+                logger.info(
+                    f"[MemoryInjector][second-response] cache={cache_state} "
+                    f"injected={len(self._session_memory.memories)} chars={len(block)}"
+                )
+            logger.info(
+                f"[MemoryInjector] cache={cache_state} turn={self._turn} "
+                f"injected={len(self._session_memory.memories)} chars={len(block)}"
+            )
+        except Exception as exc:
+            logger.error(f"[HydraDB] memory injection failed: {exc}")
+
+    def _last_user_message(self) -> str:
+        for m in reversed(self._context.get_messages()):
+            if isinstance(m, dict) and m.get("role") == "user":
+                return _extract_text(m.get("content")).strip()
+        return ""
+
+    def _is_memory_message(self, m: Any) -> bool:
+        return (
+            isinstance(m, dict)
+            and m.get("role") == "system"
+            and isinstance(m.get("content"), str)
+            and m["content"].startswith(self.MEMORY_PREFIX)
+        )
+
+    def _inject_block(self, block: str, *, second_response: bool = False):
+        """Insert/replace the memory block as a system message just below the main
+        prompt (and below the rolling summary if present), so it never collides with
+        the RollingSummarizer's position-1 summary."""
+        original = self._context.get_messages()
+        filtered = [m for m in original if not self._is_memory_message(m)]
+        if not block:
+            if len(filtered) != len(original):  # drop a now-stale block
+                self._context.set_messages(filtered)
+            if second_response:
+                logger.info("[Prompt][second-response] memory_context_added=false")
+            logger.info("[Prompt] memory_context_added=false preview=''")
+            return
+        insert_at = 1 if filtered else 0
+        if (
+            len(filtered) > insert_at
+            and isinstance(filtered[insert_at], dict)
+            and isinstance(filtered[insert_at].get("content"), str)
+            and filtered[insert_at]["content"].startswith(RollingSummarizer.SUMMARY_PREFIX)
+        ):
+            insert_at += 1
+        filtered.insert(insert_at, {"role": "system", "content": block})
+        self._context.set_messages(filtered)
+        preview = block[:200].replace("\n", "\\n")
+        logger.info(
+            f"[Prompt] memory_context_added=true chars={len(block)} preview={preview!r}"
+        )
+        if second_response:
+            logger.info(
+                f"[Prompt][second-response] memory_context_added=true "
+                f"chars={len(block)} preview={preview!r}"
+            )
+
+    def _inject_cached_block(self, *, second_response: bool = False) -> str:
+        block = self._session_memory.context_block()
+        self._inject_block(block, second_response=second_response)
+        return block
+
+
+async def _write_session_memory(
+    user_id: str | None,
+    session_id: str | None,
+    summarizer: RollingSummarizer,
+    crisis_flagged: bool,
+) -> tuple[bool, str]:
+    """Distill a finished session into ONE durable HydraDB memory for the user.
+
+    Stores the final rolling summary + mood trajectory (+ a crisis note if one was
+    raised) — never the raw transcript, which stays in Supabase. No-op when there is
+    no user_id (anonymous) or HydraDB is unconfigured.
+    """
+    if not user_id:
+        logger.info("[HydraDB] no user_id (anonymous session) — skipping memory write")
+        return False, ""
+    final = await summarizer.final_summary()
+    if not final:
+        logger.info(
+            f"[HydraDB] no distilled summary for session {session_id} — skipping write"
+        )
+        return False, ""
+
+    parts = [final["summary"]]
+    tags = [s.get("emotional_tag") for s in summarizer.summaries if s.get("emotional_tag")]
+    trajectory = [t for t in (tags or [final.get("emotional_tag")]) if t]
+    if trajectory:
+        parts.append("Mood trajectory: " + " → ".join(trajectory) + ".")
+    if crisis_flagged:
+        parts.append("A crisis signal was raised during this session.")
+    text = " ".join(parts)
+
+    date = datetime.now(UTC).date().isoformat()
+    wrote = await hydra_memory.hydra.write_memory(
+        user_id,
+        text,
+        title=f"Therapy session {date}",
+        source_id=f"session:{session_id}",
+        category="session_summary",
+    )
+    return wrote, text
+
 
 async def run_bot(
     transport: BaseTransport,
@@ -444,8 +632,8 @@ async def run_bot(
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(),  # default stop_secs=0.2, already snappy
-            user_turn_strategies=UserTurnStrategies(
-                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=smart_turn)],
+            user_turn_strategies=UserTurnStrategies( 
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=smart_turn)], 
             ),
         ),
     )
@@ -465,6 +653,11 @@ async def run_bot(
         summarizer_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     rolling_summarizer = RollingSummarizer(context, summarizer_client, model=summarizer_model)
 
+    # Long-term memory cache: loaded once at session start, injected every turn,
+    # and refreshed in the background only when warranted.
+    session_memory = hydra_memory.SessionMemory()
+    memory_injector = MemoryInjector(context, session_memory, user_id, SESSION_START_MESSAGE)
+
     # Pipeline - persister sits right after the LLM so it observes response-end
     # frames; it reads the shared context for message text. The rolling
     # summarizer sits just after it, watching the same response-end frames.
@@ -473,6 +666,7 @@ async def run_bot(
             transport.input(),
             stt,
             user_aggregator,
+            memory_injector,
             llm,
             persister,
             rolling_summarizer,
@@ -491,7 +685,11 @@ async def run_bot(
         observers=[],
     )
 
+    # Set when the crisis tool fires; folded into the session's long-term memory.
+    crisis_flagged = False
+
     async def detect_crisis_intent(params: FunctionCallParams):
+        nonlocal crisis_flagged
         # Guard against false triggers before the user has actually said anything
         # (e.g. the model calling this on the opening greeting turn).
         real_user_input = False
@@ -508,6 +706,7 @@ async def run_bot(
             return
 
         severity = params.arguments.get("severity", "unknown")
+        crisis_flagged = True
         logger.warning(f"Crisis detected (severity={severity}) for session {session_id}")
         # Notify the client so it can raise the CrisisModal. The client receives
         # this via its onGenericMessage callback (type: "crisis").
@@ -525,8 +724,10 @@ async def run_bot(
         base_prompt = load_latest_prompt()
         final_prompt = base_prompt + "\n\n" + system_prompt if system_prompt else base_prompt
         context.add_message({"role": "system", "content": final_prompt})
+
         context.add_message({"role": "user", "content": SESSION_START_MESSAGE})
         await worker.queue_frames([LLMRunFrame()])
+        session_memory.start_background_load(user_id)
 
     session_finalized = False
 
@@ -545,11 +746,32 @@ async def run_bot(
                 return
             save_transcript_file(session_id, transcript)
             save_summaries_file(session_id, rolling_summarizer.summaries)
+
+            # Long-term memory: distill this session into one durable HydraDB memory
+            # for the user (raw messages stay in Supabase). Isolated in its own
+            # try/except so a memory failure never disrupts the rest of finalization.
+            try:
+                wrote_memory, memory_text = await _write_session_memory(
+                    user_id, session_id, rolling_summarizer, crisis_flagged
+                )
+                if wrote_memory:
+                    session_memory.refresh_after_memory_write(user_id, memory_text)
+            except Exception as mem_exc:
+                logger.error(f"[HydraDB] session memory write failed: {mem_exc}")
+
+            # Per-session memory cache stats (cache hits vs HydraDB queries).
+            session_memory.log_session_stats(session_id)
+
             # Record the prompt version used for THIS session before any rewrite.
             current_version = improver.load_latest_prompt()[1]
-            weave_eval.init_weave()
-            scores = await weave_eval.evaluate_session(transcript)
-            new_version = await improver.maybe_improve(scores)
+            # Single final-transcript pass: score the session, fold in the
+            # rolling summaries, and generate the next prompt — all captured in
+            # one Weave trace (scores, latest summary, and new prompt visible).
+            result = await weave_eval.evaluate_and_improve(
+                transcript, rolling_summarizer.summaries
+            )
+            scores = result["scores"]
+            new_version = result["new_prompt_version"]
             improver.save_report(session_id, scores, current_version, new_version)
         except Exception as e:
             logger.error(f"Error during session finalization: {e}")

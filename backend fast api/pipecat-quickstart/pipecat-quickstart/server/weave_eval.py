@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from loguru import logger
 from openai import AsyncOpenAI
 
+import improver  # local: prompt versioning + the traced prompt-generation op
+
 # bot.py imports this module before it calls load_dotenv(), so load the
 # environment here too — weave.init() and the judge client both read from it.
 load_dotenv()
@@ -318,5 +320,74 @@ async def evaluate_session(transcript: list[dict]) -> dict:
     init_weave()
     try:
         return await _evaluate_session_traced(transcript)
+    finally:
+        await flush_weave()
+
+
+@weave.op(name="session_evaluation", eager_call_start=True)
+async def _evaluate_and_improve_traced(
+    transcript: list[dict], summaries: list[dict] | None = None
+) -> dict:
+    """Parent op: score the FINAL transcript, then generate the next prompt.
+
+    Runs the judge scorer (child op ``session_judge``) and the prompt rewrite
+    (child op ``generate_improved_prompt``) under one trace, so a single Weave
+    call shows the scores, the rolling session summary, AND the generated prompt.
+
+    ``eager_call_start=True`` is required for the ``set_display_name`` below to
+    stick on this parent call — without it Weave drops the name and the Traces
+    table shows a bare "session_evaluation" with no scores.
+    """
+    summaries = summaries or []
+    scores = await _evaluate_session_traced(transcript)
+    new_version = await improver.maybe_improve(scores)
+
+    # Surface the freshly written prompt text at the parent level too, so it is
+    # visible directly on this call's output (not only inside the child op).
+    new_prompt = None
+    if new_version:
+        try:
+            new_prompt = (improver.PROMPTS_DIR / new_version).read_text().strip()
+        except Exception:
+            new_prompt = None
+
+    # The "updated summary" the rolling summarizer produced during the session.
+    latest_summary = summaries[-1] if summaries else None
+
+    call = weave.get_current_call()
+    if call is not None:
+        parts = [f"session_evaluation | {_scores_summary(scores)}"]
+        if latest_summary and latest_summary.get("emotional_tag"):
+            parts.append(f"mood={latest_summary['emotional_tag']}")
+        parts.append(f"prompt {'→ ' + new_version if new_version else 'no change'}")
+        call.set_display_name(" | ".join(parts))
+
+    return {
+        "scores": scores,
+        "latest_summary": latest_summary,
+        "summaries": summaries,
+        "new_prompt_version": new_version,
+        "new_prompt": new_prompt,
+    }
+
+
+async def evaluate_and_improve(
+    transcript: list[dict], summaries: list[dict] | None = None
+) -> dict:
+    """Score the final transcript, fold in the rolling session summaries, AND
+    generate an improved prompt — all in ONE Weave trace.
+
+    This is the single end-of-session pass: call it once, on the final
+    transcript, not per turn. ``summaries`` is the rolling summarizer's
+    ``summaries`` list so the latest clinical summary + emotional tag are
+    visible on the trace. Returns ``{"scores", "latest_summary", "summaries",
+    "new_prompt_version", "new_prompt"}``.
+
+    Flushes Weave before returning so the trace uploads even when the caller
+    tears the process down immediately afterwards (as Pipecat Cloud does).
+    """
+    init_weave()
+    try:
+        return await _evaluate_and_improve_traced(transcript, summaries)
     finally:
         await flush_weave()

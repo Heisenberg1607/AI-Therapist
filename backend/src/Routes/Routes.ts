@@ -18,6 +18,8 @@ import {
   backfillRatings,
   getRatingsSummary,
   backfillMoods,
+  getMemories,
+  getMemoryGraph,
 } from "../Controller/Controller";
 import { authenticate } from "../middleware/authMiddleware";
 import multer from "multer";
@@ -107,6 +109,24 @@ router.get("/sessions/:sessionId/messages", authenticate, async (req, res, next)
 router.get("/analytics", authenticate, async (req, res, next) => {
   try {
     await getAnalytics(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// User-scoped HydraDB long-term memories.
+router.get("/memories", authenticate, async (req, res, next) => {
+  try {
+    await getMemories(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// HydraDB knowledge graph for one memory (scoped to the authenticated user).
+router.get("/memories/:memoryId/graph", authenticate, async (req, res, next) => {
+  try {
+    await getMemoryGraph(req, res);
   } catch (error) {
     next(error);
   }

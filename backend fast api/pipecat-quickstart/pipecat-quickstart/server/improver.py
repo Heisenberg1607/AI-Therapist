@@ -14,6 +14,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
+import weave
 from dotenv import load_dotenv
 from loguru import logger
 from openai import AsyncOpenAI
@@ -89,6 +90,36 @@ def get_next_version(current_name: str) -> str:
     return f"v{num + 1}.txt"
 
 
+@weave.op(name="generate_improved_prompt", kind="llm")
+async def generate_improved_prompt(current_prompt: str, failed_summary: str) -> str:
+    """Rewrite the system prompt to target the failing metrics.
+
+    This is a Weave op: the inputs (the current prompt and the failing-metric
+    summary) and the output (the rewritten prompt) are all visible in the Weave
+    trace, so the generated prompt is inspectable alongside the session scores.
+    """
+    instructions = (
+        "You are improving the system prompt for an AI therapist voice agent. "
+        "The previous session scored below target on these metrics ONLY: "
+        f"{failed_summary}. Rewrite the system prompt so future sessions improve "
+        "on those specific metrics, while preserving everything that already "
+        "works. Do not change the agent's core role, persona, or its "
+        "crisis-detection behavior. Return ONLY the full rewritten system prompt "
+        "as plain text — no preamble, no markdown, no explanation."
+    )
+
+    client, model = _rewrite_client()
+    response = await client.chat.completions.create(
+        model=model,
+        temperature=0.4,
+        messages=[
+            {"role": "system", "content": instructions},
+            {"role": "user", "content": f"CURRENT SYSTEM PROMPT:\n{current_prompt}"},
+        ],
+    )
+    return (response.choices[0].message.content or "").strip()
+
+
 async def maybe_improve(scores: dict) -> str | None:
     """Rewrite the system prompt if any thresholded metric failed.
 
@@ -114,28 +145,8 @@ async def maybe_improve(scores: dict) -> str | None:
         f"{m} (scored {scores.get(m)}, target {THRESHOLDS[m]})" for m in failed
     )
 
-    instructions = (
-        "You are improving the system prompt for an AI therapist voice agent. "
-        "The previous session scored below target on these metrics ONLY: "
-        f"{failed_summary}. Rewrite the system prompt so future sessions improve "
-        "on those specific metrics, while preserving everything that already "
-        "works. Do not change the agent's core role, persona, or its "
-        "crisis-detection behavior. Return ONLY the full rewritten system prompt "
-        "as plain text — no preamble, no markdown, no explanation."
-    )
-
-    client, model = _rewrite_client()
-
     try:
-        response = await client.chat.completions.create(
-            model=model,
-            temperature=0.4,
-            messages=[
-                {"role": "system", "content": instructions},
-                {"role": "user", "content": f"CURRENT SYSTEM PROMPT:\n{current_prompt}"},
-            ],
-        )
-        improved = (response.choices[0].message.content or "").strip()
+        improved = await generate_improved_prompt(current_prompt, failed_summary)
     except Exception as exc:
         logger.error(f"[improver] Rewrite failed ({exc}); skipping improvement")
         return None

@@ -81,6 +81,47 @@ export interface UserAnalytics {
   messages: { total: number; user: number; ai: number; avgPerSession: number };
 }
 
+export interface HydraMemory {
+  id: string;
+  content: string;
+  title: string | null;
+  sourceId: string | null;
+  createdAt: string | null;
+}
+
+export interface HydraMemoryGraphNode {
+  id: string;
+  label: string;
+  type: "entity" | "memory" | "concept";
+  entityType?: string | null;
+  isPrimary?: boolean;
+}
+
+export interface HydraMemoryGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+}
+
+export interface HydraMemoriesDashboard {
+  tenantId: string;
+  subTenantId: string;
+  memories: HydraMemory[];
+}
+
+export interface HydraMemoryGraphResponse {
+  memoryId: string;
+  title: string | null;
+  sourceId: string;
+  graph: {
+    nodes: HydraMemoryGraphNode[];
+    edges: HydraMemoryGraphEdge[];
+    entityCount: number;
+    relationCount: number;
+  };
+}
+
 interface LoginResponse {
   message: string;
   user: AuthUser;
@@ -271,6 +312,31 @@ export const getAnalyticsApi = async (
   }
   const data = await response.json();
   return (data.analytics as UserAnalytics) ?? null;
+};
+
+export const getMemoriesApi =
+  async (): Promise<HydraMemoriesDashboard | null> => {
+    const response = await fetch(`${API_BASE_URL}/memories`, {
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      if (response.status === 401) removeToken();
+      return null;
+    }
+    return (await response.json()) as HydraMemoriesDashboard;
+  };
+
+export const getMemoryGraphApi = async (
+  memoryId: string,
+): Promise<HydraMemoryGraphResponse | null> => {
+  const response = await fetch(`${API_BASE_URL}/memories/${memoryId}/graph`, {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    if (response.status === 401) removeToken();
+    return null;
+  }
+  return (await response.json()) as HydraMemoryGraphResponse;
 };
 
 export interface ClinicsPage {

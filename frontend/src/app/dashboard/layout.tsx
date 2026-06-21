@@ -11,6 +11,7 @@ import {
   MessageSquare,
   MapPin,
   BarChart3,
+  Brain,
   // Settings,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ const navigation = [
   },
   { name: "Nearby Clinics", href: "/dashboard/clinics", icon: MapPin },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { name: "Memories", href: "/dashboard/memories", icon: Brain },
   // { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
